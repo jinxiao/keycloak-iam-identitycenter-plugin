@@ -1,5 +1,5 @@
 
-package com.example.keycloak.aws;
+package com.jinxiao.keycloak.aws;
 
 import software.amazon.awssdk.auth.credentials.*;
 import software.amazon.awssdk.regions.Region;

@@ -1,5 +1,5 @@
 
-package com.example.keycloak.aws;
+package com.jinxiao.keycloak.aws;
 
 import com.google.common.util.concurrent.RateLimiter;
 import org.keycloak.models.*;

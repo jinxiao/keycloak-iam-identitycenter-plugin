@@ -1,5 +1,5 @@
 
-package com.example.keycloak.aws;
+package com.jinxiao.keycloak.aws;
 
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Response;

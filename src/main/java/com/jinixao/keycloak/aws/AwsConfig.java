@@ -1,5 +1,5 @@
 
-package com.example.keycloak.aws;
+package com.jinxiao.keycloak.aws;
 
 import org.keycloak.models.RealmModel;
 
