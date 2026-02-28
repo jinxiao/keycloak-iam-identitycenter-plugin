@@ -12,16 +12,15 @@ public class AwsClientFactory {
     public static IdentitystoreClient create(AwsConfig config) {
 
         AwsCredentialsProvider base = DefaultCredentialsProvider.create();
-        AwsCredentialsProvider finalProvider = base;
+        AwsCredentialsProvider provider = base;
 
         if (config.roleArn != null && !config.roleArn.isEmpty()) {
-
             StsClient sts = StsClient.builder()
                     .region(Region.of(config.region))
                     .credentialsProvider(base)
                     .build();
 
-            finalProvider = StsAssumeRoleCredentialsProvider.builder()
+            provider = StsAssumeRoleCredentialsProvider.builder()
                     .stsClient(sts)
                     .refreshRequest(r -> r.roleArn(config.roleArn)
                             .roleSessionName("kc-sync"))
@@ -30,7 +29,7 @@ public class AwsClientFactory {
 
         return IdentitystoreClient.builder()
                 .region(Region.of(config.region))
-                .credentialsProvider(finalProvider)
+                .credentialsProvider(provider)
                 .build();
     }
 }

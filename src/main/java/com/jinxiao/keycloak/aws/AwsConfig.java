@@ -4,7 +4,6 @@ package com.jinxiao.keycloak.aws;
 import org.keycloak.models.RealmModel;
 
 public class AwsConfig {
-
     public String region;
     public String roleArn;
     public String identityStoreId;
@@ -17,7 +16,7 @@ public class AwsConfig {
         c.identityStoreId = realm.getAttribute("aws.identityStoreId");
         c.maxQps = Integer.parseInt(
                 realm.getAttribute("aws.maxQps") == null ? "5" :
-                        realm.getAttribute("aws.maxQps"));
+                realm.getAttribute("aws.maxQps"));
         return c;
     }
 }
