@@ -109,6 +109,27 @@ bin/kcadm.sh update realms/myrealm \
   -s 'attributes."aws.maxQps"=5'
 ```
 
+**Using JSON File to Update**
+
+**For Windows OS, please use this way**
+
+Create following JSON file:
+
+```json
+{
+  "attributes": {
+    "aws.region": "us-east-1",
+    "aws.identityStoreId": "d-1234567890",
+    "aws.roleArn": "arn:aws:iam::123456789012:role/KeycloakSyncRole",
+    "aws.maxQps": 5
+  }
+}
+```
+
+```cmd
+kcadm.bat update realms/test -f update-realms.json
+```
+
 Verify:
 
 ``` bash
