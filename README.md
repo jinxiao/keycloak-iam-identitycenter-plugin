@@ -6,8 +6,7 @@ A **Keycloak 26+** extension that enables:
 -   Optional STS AssumeRole (configurable per realm)
 -   Full synchronization with AWS IAM Identity Center via IdentityStore
     API
--   Real-time sync progress tracking
--   Batch processing (30 users per batch)
+-   Sync result statistics in API response
 -   API rate limiting support
 -   Automatic user update synchronization via Keycloak event listener
 -   Realm-level configuration (multi-tenant ready)
@@ -111,12 +110,12 @@ Requirements:
 Build:
 
 ``` bash
-mvn clean package
+mvn "-Dkc.version=26.1.2" clean package
 ```
 
 Output:
 
-    target/keycloak-aws-identitycenter-plugin-1.0.0.jar
+    target/keycloak-aws-identitycenter-plugin-2.0.0.jar
 
 ------------------------------------------------------------------------
 
@@ -140,30 +139,38 @@ bin/kc.sh build
 bin/kc.sh start
 ```
 
+4.  Enable event listener in realm settings:
+
+-   Realm Settings -> Events -> Event Listeners
+-   Add `aws-identitycenter-sync`
+
 ------------------------------------------------------------------------
 
 ## REST Endpoints
 
 ### Trigger Full Sync
 
-POST /realms/{realm}/aws-sync/sync
+POST /realms/{realm}/aws-identitycenter-sync/full-sync
 
-### Check Sync Progress
+Requires:
 
-GET /realms/{realm}/aws-sync/progress
+-   Bearer token with `realm-management/manage-users` role in target realm
 
-Returns:
+Returns JSON:
 
-Number of processed users
+-   status (`success` or `partial_success`)
+-   usersProcessed
+-   groupsProcessed
+-   usersFailed
+-   groupsFailed
 
 ------------------------------------------------------------------------
 
 ## Sync Behavior
 
--   Users processed in batches of 30
 -   Rate limiting via Guava RateLimiter
--   Runs in background thread
--   Progress stored in memory
+-   Synchronous request/response
+-   Conflict errors are treated as already synchronized
 
 ------------------------------------------------------------------------
 
@@ -171,8 +178,8 @@ Number of processed users
 
 -   No persistent job storage
 -   No UI extension included (REST only)
--   IdentityStore does not provide true batch APIs (logical batching
-    implemented)
+-   Event listener currently triggers a full sync on user/group admin
+    changes
 
 ------------------------------------------------------------------------
 

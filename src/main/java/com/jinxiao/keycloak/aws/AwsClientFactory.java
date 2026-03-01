@@ -9,13 +9,14 @@ import software.amazon.awssdk.services.sts.auth.StsAssumeRoleCredentialsProvider
 
 public class AwsClientFactory {
 
-    public static IdentitystoreClient create(AwsConfig config) {
+    public static AwsClients create(AwsConfig config) {
 
         AwsCredentialsProvider base = DefaultCredentialsProvider.create();
         AwsCredentialsProvider provider = base;
+        StsClient sts = null;
 
         if (config.roleArn != null && !config.roleArn.isEmpty()) {
-            StsClient sts = StsClient.builder()
+            sts = StsClient.builder()
                     .region(Region.of(config.region))
                     .credentialsProvider(base)
                     .build();
@@ -27,9 +28,32 @@ public class AwsClientFactory {
                     .build();
         }
 
-        return IdentitystoreClient.builder()
+        IdentitystoreClient identitystore = IdentitystoreClient.builder()
                 .region(Region.of(config.region))
                 .credentialsProvider(provider)
                 .build();
+        return new AwsClients(identitystore, sts);
+    }
+
+    public static final class AwsClients implements AutoCloseable {
+        private final IdentitystoreClient identitystore;
+        private final StsClient sts;
+
+        private AwsClients(IdentitystoreClient identitystore, StsClient sts) {
+            this.identitystore = identitystore;
+            this.sts = sts;
+        }
+
+        public IdentitystoreClient identitystore() {
+            return identitystore;
+        }
+
+        @Override
+        public void close() {
+            identitystore.close();
+            if (sts != null) {
+                sts.close();
+            }
+        }
     }
 }
