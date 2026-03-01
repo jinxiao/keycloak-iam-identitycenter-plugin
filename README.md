@@ -77,6 +77,46 @@ Each realm can configure independently:
 
 ------------------------------------------------------------------------
 
+## Updating Realm Configuration Values
+
+These values are stored as **realm attributes** in Keycloak and are persisted
+in the Keycloak database.
+
+Keys used by this plugin:
+
+-   `aws.region` (required)
+-   `aws.identityStoreId` (required)
+-   `aws.roleArn` (optional)
+-   `aws.maxQps` (optional, default is `5`)
+
+**Note**: Web UI does not support to update the REALM attributes!!!!
+
+### Update with `kcadm`
+
+``` bash
+# Login first
+bin/kcadm.sh config credentials \
+  --server http://localhost:8080 \
+  --realm master \
+  --user admin \
+  --password admin
+
+# Update attributes in realm "myrealm"
+bin/kcadm.sh update realms/myrealm \
+  -s 'attributes."aws.region"=us-east-1' \
+  -s 'attributes."aws.identityStoreId"=d-1234567890' \
+  -s 'attributes."aws.roleArn"=arn:aws:iam::123456789012:role/KeycloakSyncRole' \
+  -s 'attributes."aws.maxQps"=5'
+```
+
+Verify:
+
+``` bash
+bin/kcadm.sh get realms/myrealm --fields attributes
+```
+
+------------------------------------------------------------------------
+
 ## Required AWS Permissions
 
 ``` json
