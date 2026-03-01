@@ -171,24 +171,8 @@ Number of processed users
 
 -   No persistent job storage
 -   No UI extension included (REST only)
--   No incremental sync yet
--   No automatic deletion handling
 -   IdentityStore does not provide true batch APIs (logical batching
     implemented)
-
-------------------------------------------------------------------------
-
-## Production Recommendations
-
-For enterprise environments, consider:
-
--   Using ManagedExecutorService instead of raw threads
--   Adding persistent job tracking
--   Implementing incremental sync
--   Adding conflict resolution
--   Adding retry/backoff strategy
--   Implementing audit logging
--   Implementing full bidirectional sync
 
 ------------------------------------------------------------------------
 
@@ -202,6 +186,6 @@ For enterprise environments, consider:
 
 ## License
 
-MIT (or your preferred license)
+Apache 2.0
 
 ------------------------------------------------------------------------
