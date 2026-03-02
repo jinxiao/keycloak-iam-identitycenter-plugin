@@ -70,6 +70,7 @@ Each realm can configure independently:
 
   Key                   Description
   --------------------- -----------------------------
+  aws.enabled           Enable sync for this realm (default: false)
   aws.region            AWS Region
   aws.roleArn           Optional AssumeRole ARN
   aws.identityStoreId   Identity Center Instance ID
@@ -84,6 +85,7 @@ in the Keycloak database.
 
 Keys used by this plugin:
 
+-   `aws.enabled` (optional, default is `false`)
 -   `aws.region` (required)
 -   `aws.identityStoreId` (required)
 -   `aws.roleArn` (optional)
@@ -103,6 +105,7 @@ bin/kcadm.sh config credentials \
 
 # Update attributes in realm "myrealm"
 bin/kcadm.sh update realms/myrealm \
+  -s 'attributes."aws.enabled"=true' \
   -s 'attributes."aws.region"=us-east-1' \
   -s 'attributes."aws.identityStoreId"=d-1234567890' \
   -s 'attributes."aws.roleArn"=arn:aws:iam::123456789012:role/KeycloakSyncRole' \
@@ -118,6 +121,7 @@ Create following JSON file:
 ```json
 {
   "attributes": {
+    "aws.enabled": true,
     "aws.region": "us-east-1",
     "aws.identityStoreId": "d-1234567890",
     "aws.roleArn": "arn:aws:iam::123456789012:role/KeycloakSyncRole",

@@ -29,6 +29,7 @@ public class SyncResource {
     public Response fullSync() {
         RealmModel realm = session.getContext().getRealm();
         requireManageUsersPermission(realm);
+        requirePluginEnabled(realm);
 
         IdentityCenterSyncManager.SyncResult result = new IdentityCenterSyncManager().fullSync(session, realm);
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -59,6 +60,12 @@ public class SyncResource {
         RoleModel manageUsersRole = realmManagement.getRole(AdminRoles.MANAGE_USERS);
         if (manageUsersRole == null || !auth.getUser().hasRole(manageUsersRole)) {
             throw new ForbiddenException("manage-users role is required");
+        }
+    }
+
+    private void requirePluginEnabled(RealmModel realm) {
+        if (!AwsConfig.isEnabled(realm)) {
+            throw new ForbiddenException("AWS Identity Center sync is disabled for this realm. Set realm attribute aws.enabled=true to enable.");
         }
     }
 }

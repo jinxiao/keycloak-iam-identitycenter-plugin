@@ -25,6 +25,9 @@ public class IdentityCenterEventListener implements EventListenerProvider {
         if (realm == null) {
             return;
         }
+        if (!AwsConfig.isEnabled(realm)) {
+            return;
+        }
 
         if (event == null || (event.getResourceType() != ResourceType.USER && event.getResourceType() != ResourceType.GROUP)) {
             return;
