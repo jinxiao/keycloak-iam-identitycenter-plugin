@@ -1,5 +1,4 @@
-
-package com.jinxiao.keycloak.aws;
+﻿package com.jinxiao.keycloak.aws;
 
 import org.keycloak.models.RealmModel;
 
@@ -9,6 +8,12 @@ public class AwsConfig {
     public String roleArn;
     public String identityStoreId;
     public int maxQps;
+    public UserNameSource userNameSource;
+
+    public enum UserNameSource {
+        USERNAME,
+        EMAIL
+    }
 
     public static AwsConfig fromRealm(RealmModel realm) {
         AwsConfig c = new AwsConfig();
@@ -20,6 +25,7 @@ public class AwsConfig {
         c.roleArn = realm.getAttribute("aws.roleArn");
         c.identityStoreId = required(realm.getAttribute("aws.identityStoreId"), "aws.identityStoreId");
         c.maxQps = parsePositiveInt(realm.getAttribute("aws.maxQps"), 5, "aws.maxQps");
+        c.userNameSource = parseUserNameSource(realm.getAttribute("aws.userNameSource"), UserNameSource.USERNAME, "aws.userNameSource");
         return c;
     }
 
@@ -61,5 +67,21 @@ public class AwsConfig {
             return false;
         }
         throw new IllegalArgumentException("Realm attribute must be true or false: " + key);
+    }
+
+    private static UserNameSource parseUserNameSource(String value, UserNameSource defaultValue, String key) {
+        if (value == null || value.trim().isEmpty()) {
+            return defaultValue;
+        }
+
+        String normalized = value.trim().toLowerCase();
+        if ("username".equals(normalized)) {
+            return UserNameSource.USERNAME;
+        }
+        if ("email".equals(normalized)) {
+            return UserNameSource.EMAIL;
+        }
+
+        throw new IllegalArgumentException("Realm attribute must be username or email: " + key);
     }
 }

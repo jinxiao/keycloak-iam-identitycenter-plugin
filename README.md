@@ -1,4 +1,4 @@
-# Keycloak AWS Identity Center Plugin
+﻿# Keycloak AWS Identity Center Plugin
 
 A **Keycloak 26+** extension that enables:
 
@@ -16,13 +16,13 @@ A **Keycloak 26+** extension that enables:
 ## Architecture Overview
 
 Admin UI / REST\
-↓\
+鈫揬
 RealmResourceProvider\
-↓\
+鈫揬
 AwsSyncService\
-↓\
+鈫揬
 AWS SDK v2\
-↓\
+鈫揬
 IAM Identity Center (IdentityStore API)
 
 ------------------------------------------------------------------------
@@ -57,10 +57,11 @@ Optional:
 
 ### 3. Event-Based Sync
 
-When a user profile is updated in Keycloak, the plugin:
+When users, groups, or group memberships are changed in Keycloak, the plugin:
 
--   Listens to update events
--   Calls IdentityStore API to propagate changes
+-   Listens to admin user/group/group-membership events
+-   Listens to user lifecycle events (for example registration/profile changes)
+-   Triggers incremental sync for the affected user/group/membership only
 
 ------------------------------------------------------------------------
 
@@ -75,6 +76,7 @@ Each realm can configure independently:
   aws.roleArn           Optional AssumeRole ARN
   aws.identityStoreId   Identity Center Instance ID
   aws.maxQps            API rate limit
+  aws.userNameSource    UserName source for AWS (username|email)
 
 ------------------------------------------------------------------------
 
@@ -90,6 +92,7 @@ Keys used by this plugin:
 -   `aws.identityStoreId` (required)
 -   `aws.roleArn` (optional)
 -   `aws.maxQps` (optional, default is `5`)
+-   `aws.userNameSource` (optional, `username` or `email`, default is `username`)
 
 **Note**: Web UI does not support to update the REALM attributes!!!!
 
@@ -109,7 +112,8 @@ bin/kcadm.sh update realms/myrealm \
   -s 'attributes."aws.region"=us-east-1' \
   -s 'attributes."aws.identityStoreId"=d-1234567890' \
   -s 'attributes."aws.roleArn"=arn:aws:iam::123456789012:role/KeycloakSyncRole' \
-  -s 'attributes."aws.maxQps"=5'
+  -s 'attributes."aws.maxQps"=5' \
+  -s 'attributes."aws.userNameSource"=username'
 ```
 
 **Using JSON File to Update**
@@ -125,7 +129,8 @@ Create following JSON file:
     "aws.region": "us-east-1",
     "aws.identityStoreId": "d-1234567890",
     "aws.roleArn": "arn:aws:iam::123456789012:role/KeycloakSyncRole",
-    "aws.maxQps": 5
+    "aws.maxQps": 5,
+    "aws.userNameSource": "username"
   }
 }
 ```
@@ -150,8 +155,10 @@ bin/kcadm.sh get realms/myrealm --fields attributes
   "Action": [
     "identitystore:CreateUser",
     "identitystore:UpdateUser",
+    "identitystore:DeleteUser",
     "identitystore:CreateGroup",
     "identitystore:UpdateGroup",
+    "identitystore:DeleteGroup",
     "identitystore:CreateGroupMembership",
     "identitystore:DeleteGroupMembership",
     "identitystore:ListUsers",
@@ -180,7 +187,13 @@ mvn "-Dkc.version=26.1.2" clean package
 
 Output:
 
-    target/keycloak-aws-identitycenter-plugin-2.0.0.jar
+    target/keycloak-aws-identitycenter-sync-<version>.jar
+
+GitHub Actions release build:
+
+-   Workflow reads the GitHub Release tag (for example `v2.1.0`)
+-   Tag value is passed into Maven as `-Drevision`
+-   Final published JAR/version uses this release version (`2.1.0` in this example)
 
 ------------------------------------------------------------------------
 
@@ -243,8 +256,6 @@ Returns JSON:
 
 -   No persistent job storage
 -   No UI extension included (REST only)
--   Event listener currently triggers a full sync on user/group admin
-    changes
 
 ------------------------------------------------------------------------
 
@@ -261,3 +272,10 @@ Returns JSON:
 Apache 2.0
 
 ------------------------------------------------------------------------
+
+
+
+
+
+
+
