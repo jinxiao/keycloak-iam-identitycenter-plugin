@@ -1,4 +1,4 @@
-﻿package com.jinxiao.keycloak.aws;
+package com.jinxiao.keycloak.aws;
 
 import com.google.common.util.concurrent.RateLimiter;
 import org.keycloak.models.GroupModel;
@@ -15,18 +15,17 @@ import software.amazon.awssdk.services.identitystore.model.CreateUserRequest;
 import software.amazon.awssdk.services.identitystore.model.DeleteGroupMembershipRequest;
 import software.amazon.awssdk.services.identitystore.model.DeleteGroupRequest;
 import software.amazon.awssdk.services.identitystore.model.DeleteUserRequest;
-import software.amazon.awssdk.services.identitystore.model.Filter;
+import software.amazon.awssdk.services.identitystore.model.GetGroupIdRequest;
+import software.amazon.awssdk.services.identitystore.model.GetUserIdRequest;
 import software.amazon.awssdk.services.identitystore.model.Group;
 import software.amazon.awssdk.services.identitystore.model.GroupMembership;
 import software.amazon.awssdk.services.identitystore.model.ListGroupMembershipsRequest;
 import software.amazon.awssdk.services.identitystore.model.ListGroupMembershipsResponse;
-import software.amazon.awssdk.services.identitystore.model.ListGroupsRequest;
-import software.amazon.awssdk.services.identitystore.model.ListGroupsResponse;
-import software.amazon.awssdk.services.identitystore.model.ListUsersRequest;
-import software.amazon.awssdk.services.identitystore.model.ListUsersResponse;
 import software.amazon.awssdk.services.identitystore.model.MemberId;
+import software.amazon.awssdk.services.identitystore.model.ResourceNotFoundException;
 import software.amazon.awssdk.services.identitystore.model.UpdateGroupRequest;
 import software.amazon.awssdk.services.identitystore.model.UpdateUserRequest;
+import software.amazon.awssdk.services.identitystore.model.UniqueAttribute;
 import software.amazon.awssdk.services.identitystore.model.User;
 
 import java.util.Collections;
@@ -364,40 +363,36 @@ public class IdentityCenterSyncManager {
         if (username == null || username.isBlank()) {
             return null;
         }
-
-        ListUsersRequest request = ListUsersRequest.builder()
-                .identityStoreId(storeId)
-                .filters(Filter.builder().attributePath("UserName").attributeValue(username).build())
-                .build();
-
-        for (ListUsersResponse page : client.listUsersPaginator(request)) {
-            for (User user : page.users()) {
-                if (username.equals(user.userName())) {
-                    return user.userId();
-                }
-            }
+        try {
+            return client.getUserId(GetUserIdRequest.builder()
+                            .identityStoreId(storeId)
+                            .alternateIdentifier(builder -> builder.uniqueAttribute(UniqueAttribute.builder()
+                                    .attributePath("UserName")
+                                    .attributeValue(Document.fromString(username))
+                                    .build()))
+                            .build())
+                    .userId();
+        } catch (ResourceNotFoundException e) {
+            return null;
         }
-        return null;
     }
 
     private String findGroupIdByDisplayName(IdentitystoreClient client, String storeId, String displayName) {
         if (displayName == null || displayName.isBlank()) {
             return null;
         }
-
-        ListGroupsRequest request = ListGroupsRequest.builder()
-                .identityStoreId(storeId)
-                .filters(Filter.builder().attributePath("DisplayName").attributeValue(displayName).build())
-                .build();
-
-        for (ListGroupsResponse page : client.listGroupsPaginator(request)) {
-            for (Group group : page.groups()) {
-                if (displayName.equals(group.displayName())) {
-                    return group.groupId();
-                }
-            }
+        try {
+            return client.getGroupId(GetGroupIdRequest.builder()
+                            .identityStoreId(storeId)
+                            .alternateIdentifier(builder -> builder.uniqueAttribute(UniqueAttribute.builder()
+                                    .attributePath("DisplayName")
+                                    .attributeValue(Document.fromString(displayName))
+                                    .build()))
+                            .build())
+                    .groupId();
+        } catch (ResourceNotFoundException e) {
+            return null;
         }
-        return null;
     }
 
     private String findMembershipId(IdentitystoreClient client, String storeId, String groupId, String userId) {

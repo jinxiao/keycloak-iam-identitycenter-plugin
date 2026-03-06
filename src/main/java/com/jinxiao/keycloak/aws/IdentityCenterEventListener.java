@@ -1,4 +1,4 @@
-﻿package com.jinxiao.keycloak.aws;
+package com.jinxiao.keycloak.aws;
 
 import org.keycloak.events.Event;
 import org.keycloak.events.EventListenerProvider;
