@@ -16,14 +16,10 @@ A **Keycloak 26+** extension that enables:
 ## Architecture Overview
 
 Admin UI / REST\
-鈫揬
-RealmResourceProvider\
-鈫揬
-AwsSyncService\
-鈫揬
-AWS SDK v2\
-鈫揬
-IAM Identity Center (IdentityStore API)
+-> RealmResourceProvider\
+-> AwsSyncService\
+-> AWS SDK v2\
+-> IAM Identity Center (IdentityStore API)
 
 ------------------------------------------------------------------------
 
