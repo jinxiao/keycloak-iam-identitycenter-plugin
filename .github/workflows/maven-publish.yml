@@ -1,4 +1,4 @@
-﻿name: Release JAR
+name: Release Provider and Theme JARs
 
 on:
   release:
@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      ARTIFACT_ID: keycloak-aws-identitycenter-sync
 
     steps:
       - uses: actions/checkout@v4
@@ -30,9 +32,28 @@ jobs:
       - name: Build with Maven
         run: mvn -B -DskipTests -Drevision=${{ steps.release_version.outputs.version }} package --file pom.xml
 
-      - name: Upload JARs to GitHub Release
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          VERSION='${{ steps.release_version.outputs.version }}'
+          PROVIDER_SOURCE="target/${ARTIFACT_ID}-${VERSION}.jar"
+          THEME_SOURCE="target/${ARTIFACT_ID}-${VERSION}-themes.jar"
+          PROVIDER_RELEASE="release-assets/${ARTIFACT_ID}-provider-${VERSION}.jar"
+          THEME_RELEASE="release-assets/${ARTIFACT_ID}-admin-theme-${VERSION}.jar"
+
+          test -f "$PROVIDER_SOURCE"
+          test -f "$THEME_SOURCE"
+
+          mkdir -p release-assets
+          cp "$PROVIDER_SOURCE" "$PROVIDER_RELEASE"
+          cp "$THEME_SOURCE" "$THEME_RELEASE"
+
+          ls -lh release-assets
+
+      - name: Upload provider and admin theme JARs to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          fail_on_unmatched_files: true
           files: |
-            target/*.jar
-            !target/original-*.jar
+            release-assets/keycloak-aws-identitycenter-sync-provider-${{ steps.release_version.outputs.version }}.jar
+            release-assets/keycloak-aws-identitycenter-sync-admin-theme-${{ steps.release_version.outputs.version }}.jar

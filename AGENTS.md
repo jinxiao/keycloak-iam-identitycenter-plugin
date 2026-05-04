@@ -107,6 +107,9 @@ change.
 - Do not commit generated `target/` content.
 - Do not revert unrelated user changes.
 - Keep commits and pull requests scoped to the requested change.
+- Release workflow assets must be named by function:
+  `keycloak-aws-identitycenter-sync-provider-<version>.jar` and
+  `keycloak-aws-identitycenter-sync-admin-theme-<version>.jar`.
 
 ## Final Checklist
 

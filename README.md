@@ -233,7 +233,11 @@ GitHub Actions release build:
 
 - Workflow reads the GitHub Release tag, for example `v2.1.0`
 - The tag value is passed into Maven as `-Drevision`
-- The published JAR version uses this release version, for example `2.1.0`
+- The workflow publishes two release assets with function-specific names:
+  - `keycloak-aws-identitycenter-sync-provider-<version>.jar`
+  - `keycloak-aws-identitycenter-sync-admin-theme-<version>.jar`
+- The Maven build still produces the intermediate files under `target/`, and
+  the workflow renames them before uploading to the GitHub Release
 
 ## Installation
 
