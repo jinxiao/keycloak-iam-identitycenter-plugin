@@ -15,7 +15,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.release>21</maven.compiler.release>
         <maven.compiler.proc>full</maven.compiler.proc>
-        <resolved.keycloak.version>26.5.5</resolved.keycloak.version>
+        <resolved.keycloak.version>26.6.1</resolved.keycloak.version>
         <aws.sdk.version>2.42.7</aws.sdk.version>
     </properties>
 
@@ -113,6 +113,25 @@
                                     </excludes>
                                 </filter>
                             </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.7.1</version>
+                <executions>
+                    <execution>
+                        <id>package-themes</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <descriptors>
+                                <descriptor>src/assembly/themes.xml</descriptor>
+                            </descriptors>
                         </configuration>
                     </execution>
                 </executions>

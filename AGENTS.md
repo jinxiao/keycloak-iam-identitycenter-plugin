@@ -18,6 +18,9 @@ repository unless a more specific `AGENTS.md` exists in a subdirectory.
 - `src/main/java/com/jinxiao/keycloak/aws`: provider, event listener, REST
   resource, AWS client/config, and sync implementation
 - `src/main/resources/META-INF/services`: Keycloak service descriptors
+- `themes/aws-identitycenter`: Keycloak admin theme source
+- `themes/META-INF/keycloak-themes.json`: theme archive descriptor
+- `src/assembly/themes.xml`: Maven assembly for the separate themes JAR
 - `pom.xml`: Maven build, dependency, profile, and shade configuration
 - `README.md`: user-facing setup, configuration, build, and deployment docs
 - `target/`: generated Maven output; do not commit
@@ -35,11 +38,13 @@ mvn -DskipTests clean package
 ```
 
 ```bash
-mvn "-Dkc.version=26.1.2" -DskipTests clean package
+mvn "-Dkc.version=26.6.1" -DskipTests clean package
 ```
 
 Always run at least `mvn -DskipTests clean compile` after Java or Maven changes.
 For documentation-only changes, explain if no build was run.
+Run `mvn -DskipTests clean package` after theme or packaging changes so the
+separate themes archive is verified.
 
 ## Runtime Configuration
 
@@ -63,10 +68,15 @@ change.
 - Preserve existing service descriptor files under `META-INF/services`.
 - Keep the provider compatible with Keycloak 26+ unless the task explicitly
   changes the support target.
+- Keep theme archives in the Keycloak-supported layout:
+  `META-INF/keycloak-themes.json` and `theme/<theme-name>/<type>/...`.
+- Admin Console configuration is implemented through Keycloak's declarative UI
+  SPI and requires the `declarative-ui` feature at runtime.
 
 ## Dependency And Shading Rules
 
 - The project uses `maven-shade-plugin` to produce a deployable provider JAR.
+- The project uses `maven-assembly-plugin` to produce a separate themes JAR.
 - Do not remove existing shade filters or Keycloak exclusions without a clear
   compatibility reason.
 - Prefer minimal dependency additions because this JAR runs inside Keycloak and
@@ -104,6 +114,8 @@ Before handing work back, confirm:
 
 - Relevant Maven verification passed, usually
   `mvn -DskipTests clean compile`.
+- Theme or packaging changes were verified with
+  `mvn -DskipTests clean package`.
 - No unnecessary new build warnings were introduced.
 - `README.md` matches current behavior and configuration keys.
 - Generated files such as `target/` are not included.

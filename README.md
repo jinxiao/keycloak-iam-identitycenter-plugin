@@ -12,16 +12,43 @@ memberships with AWS IAM Identity Center through the IdentityStore API.
 - API rate limiting support
 - Automatic incremental synchronization through Keycloak event listeners
 - Realm-level configuration for multi-tenant deployments
+- Admin Console configuration tab for AWS Identity Center realm attributes
+- Separate `aws-identitycenter` admin theme archive
 
 ## Architecture
 
 ```text
-REST endpoint
-  -> RealmResourceProvider
-  -> AwsSyncService
-  -> AWS SDK v2
-  -> IAM Identity Center IdentityStore API
+Keycloak providers directory
+  -> keycloak-aws-identitycenter-sync-<version>.jar
+       -> RealmResourceProvider
+            -> POST /realms/{realm}/aws-identitycenter-sync/full-sync
+            -> SyncResource
+            -> IdentityCenterSyncManager
+       -> EventListenerProvider
+            -> IdentityCenterEventListener
+            -> IdentityCenterSyncManager
+       -> UiTabProviderFactory
+            -> AWS Identity Center tab in Realm Settings
+            -> aws.* realm attributes
+       -> AwsClientFactory
+            -> AWS SDK v2 DefaultCredentialsProvider
+            -> optional STS AssumeRole
+            -> IAM Identity Center IdentityStore API
+
+  -> keycloak-aws-identitycenter-sync-<version>-themes.jar
+       -> aws-identitycenter admin theme
+       -> parent admin theme: keycloak.v2
+       -> META-INF/keycloak-themes.json
 ```
+
+The provider JAR contains the REST endpoint, event listener, AWS sync logic,
+and Admin Console declarative UI tab. The theme JAR is packaged separately and
+only contributes the `aws-identitycenter` admin theme that inherits
+`keycloak.v2`. Both JARs are deployed to Keycloak's `providers/` directory.
+
+Realm configuration is stored as `aws.*` realm attributes. These attributes can
+be edited from the Admin Console tab, `kcadm`, or the Keycloak Admin REST API,
+and are read by both full sync and incremental event-based sync.
 
 ## AWS Credentials
 
@@ -69,13 +96,28 @@ persisted in the Keycloak database.
 
 ### UI Support
 
-This provider does not include a Keycloak UI extension. Configuration and sync
-operations are supported through `kcadm`, Keycloak Admin REST API, and the
-provider REST endpoints only.
+This provider includes a Keycloak Admin Console extension based on the
+declarative UI SPI. The extension adds an **AWS Identity Center** tab under
+Realm Settings so administrators can configure the `aws.*` realm attributes
+from the Admin Console.
 
-The Keycloak Admin Console does not provide a dedicated form for these custom
-realm attributes. Use `kcadm` or the Admin REST API to create and update the
-`aws.*` attributes.
+The same configuration values can still be managed through `kcadm` or the
+Keycloak Admin REST API.
+
+## Theme Support
+
+The repository includes a separate Keycloak admin theme source tree under
+`themes/aws-identitycenter`.
+
+The theme provides:
+
+- An `admin` theme named `aws-identitycenter`
+- Inheritance from the built-in `keycloak.v2` admin theme
+
+The theme intentionally inherits the built-in admin theme without copying
+Admin Console assets. This keeps it easier to use with the latest Keycloak
+26.x releases while letting the provider contribute the AWS Identity Center
+configuration tab through the declarative UI SPI.
 
 ### Update with `kcadm`
 
@@ -177,13 +219,14 @@ mvn -DskipTests clean package
 Package with a specific Keycloak version:
 
 ```bash
-mvn "-Dkc.version=26.1.2" -DskipTests clean package
+mvn "-Dkc.version=26.6.1" -DskipTests clean package
 ```
 
-Output:
+Outputs:
 
 ```text
 target/keycloak-aws-identitycenter-sync-<version>.jar
+target/keycloak-aws-identitycenter-sync-<version>-themes.jar
 ```
 
 GitHub Actions release build:
@@ -194,16 +237,16 @@ GitHub Actions release build:
 
 ## Installation
 
-Copy the JAR into the Keycloak providers directory:
+Copy the provider and theme JARs into the Keycloak providers directory:
 
 ```bash
-cp target/*.jar /opt/keycloak/providers/
+cp target/keycloak-aws-identitycenter-sync-*.jar /opt/keycloak/providers/
 ```
 
 Rebuild Keycloak:
 
 ```bash
-bin/kc.sh build
+bin/kc.sh build --features=declarative-ui
 ```
 
 Start Keycloak:
@@ -223,6 +266,26 @@ bin/kcadm.sh update events/config -r myrealm \
 
 If the realm already has event listeners, include the existing listener IDs in
 the `eventsListeners` array so they remain enabled.
+
+Enable the admin theme for the realm used by the Admin Console, commonly the
+`master` realm:
+
+```bash
+bin/kcadm.sh update realms/master \
+  -s adminTheme=aws-identitycenter
+```
+
+For local theme development, copy `themes/aws-identitycenter` to
+`$KEYCLOAK_HOME/themes/aws-identitycenter` and start Keycloak with theme caches
+disabled:
+
+```bash
+bin/kc.sh start-dev \
+  --features=declarative-ui \
+  --spi-theme--static-max-age=-1 \
+  --spi-theme--cache-themes=false \
+  --spi-theme--cache-templates=false
+```
 
 ## REST Endpoints
 
@@ -254,12 +317,12 @@ Response fields:
 ## Limitations
 
 - No persistent job storage
-- No Keycloak UI extension
-- No Admin Console forms for plugin configuration
+- The Admin Console configuration tab requires Keycloak's `declarative-ui`
+  feature to be enabled
 
 ## Compatibility
 
-- Keycloak 26+
+- Keycloak 26+; default build target is Keycloak 26.6.1
 - AWS SDK v2
 - IAM Identity Center IdentityStore API
 

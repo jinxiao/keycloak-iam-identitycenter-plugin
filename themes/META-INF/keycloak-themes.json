@@ -1,0 +1,10 @@
+{
+  "themes": [
+    {
+      "name": "aws-identitycenter",
+      "types": [
+        "admin"
+      ]
+    }
+  ]
+}
