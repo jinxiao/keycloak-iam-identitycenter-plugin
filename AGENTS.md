@@ -1,63 +1,109 @@
-﻿# AGENTS.md
+# AGENTS.md
 
-Guidelines for coding agents working in this repository.
+This file gives coding agents the repository-specific context needed to work
+on `keycloak-aws-identitycenter-sync`. Instructions apply to the whole
+repository unless a more specific `AGENTS.md` exists in a subdirectory.
 
-## Project Summary
+## Project Overview
 
 - Project: `keycloak-aws-identitycenter-sync`
-- Language: Java 21
+- Language/runtime: Java 21
 - Build tool: Maven
-- Packaging: shaded JAR for Keycloak provider deployment
-- Target platform: Keycloak 26+ (version can be overridden at build time)
+- Package type: shaded JAR for Keycloak provider deployment
+- Target platform: Keycloak 26+
+- Main package: `com.jinxiao.keycloak.aws`
 
 ## Repository Layout
 
-- Source code: `src/main/java/com/jinxiao/keycloak/aws`
-- Service descriptors: `src/main/resources/META-INF/services`
-- Build config: `pom.xml`
-- Docs: `README.md`
+- `src/main/java/com/jinxiao/keycloak/aws`: provider, event listener, REST
+  resource, AWS client/config, and sync implementation
+- `src/main/resources/META-INF/services`: Keycloak service descriptors
+- `pom.xml`: Maven build, dependency, profile, and shade configuration
+- `README.md`: user-facing setup, configuration, build, and deployment docs
+- `target/`: generated Maven output; do not commit
 
-## Build and Verify
+## Build And Verification
 
-- Compile:
-  - `mvn -DskipTests clean compile`
-- Package:
-  - `mvn -DskipTests clean package`
-- Build with specific Keycloak version:
-  - `mvn "-Dkc.version=26.1.2" -DskipTests clean package`
+Use these commands from the repository root:
 
-Always run at least `clean compile` after code changes.
+```bash
+mvn -DskipTests clean compile
+```
 
-## Keycloak Compatibility Notes
+```bash
+mvn -DskipTests clean package
+```
+
+```bash
+mvn "-Dkc.version=26.1.2" -DskipTests clean package
+```
+
+Always run at least `mvn -DskipTests clean compile` after Java or Maven changes.
+For documentation-only changes, explain if no build was run.
+
+## Runtime Configuration
+
+Runtime configuration is stored in Keycloak realm attributes:
+
+- `aws.enabled`: optional, default `false`
+- `aws.region`: required
+- `aws.identityStoreId`: required
+- `aws.roleArn`: optional
+- `aws.maxQps`: optional, default `5`
+- `aws.userNameSource`: optional, default `username`; supported values are
+  `username` and `email`
+
+If configuration behavior or keys change, update `README.md` in the same
+change.
+
+## Keycloak Compatibility
 
 - Keep Keycloak dependencies in `provided` scope.
-- Avoid introducing Keycloak internal API usage unless necessary.
-- Current runtime config is read from realm attributes:
-  - `aws.region` (required)
-  - `aws.identityStoreId` (required)
-  - `aws.roleArn` (optional)
-  - `aws.maxQps` (optional, default `5`)
+- Avoid Keycloak internal APIs unless there is no suitable public API.
+- Preserve existing service descriptor files under `META-INF/services`.
+- Keep the provider compatible with Keycloak 26+ unless the task explicitly
+  changes the support target.
 
-## Dependency and Shading Rules
+## Dependency And Shading Rules
 
-- This project uses `maven-shade-plugin`.
-- Do not remove existing overlap filters in `pom.xml` unless there is a clear reason.
-- Prefer minimal dependency additions to avoid classpath conflicts inside Keycloak.
+- The project uses `maven-shade-plugin` to produce a deployable provider JAR.
+- Do not remove existing shade filters or Keycloak exclusions without a clear
+  compatibility reason.
+- Prefer minimal dependency additions because this JAR runs inside Keycloak and
+  can conflict with the server classpath.
+- Keep AWS SDK and other third-party versions centralized in `pom.xml`
+  properties when practical.
 
-## Code Change Rules
+## Coding Guidelines
 
-- Keep changes minimal and focused on the requested task.
-- Preserve existing package structure and naming conventions.
-- Use UTF-8 and keep files ASCII unless non-ASCII is required.
-- Do not commit generated `target/` content.
+- Keep changes focused on the requested task.
+- Preserve the existing package structure and naming conventions.
+- Use Java 21-compatible language features.
+- Prefer clear, small methods over broad refactors.
+- Keep files UTF-8 and ASCII unless non-ASCII text is required.
+- Add comments only when they clarify non-obvious behavior or integration
+  constraints.
 
-## Documentation Expectations
+## Documentation Guidelines
 
-- If behavior or configuration changes, update `README.md` in the same change.
+- Update `README.md` when behavior, configuration, endpoints, build commands,
+  installation steps, or compatibility notes change.
 - Keep examples copy-paste runnable.
+- Keep user-facing docs aligned with the actual Maven coordinates, artifact
+  name, realm attributes, and REST endpoints.
 
-## Safety Checks Before Finishing
+## Git And Generated Files
 
-1. `mvn -DskipTests clean compile` passes.
-2. No new build warnings introduced unnecessarily.
-3. README is consistent with current commands and configuration keys.
+- Do not commit generated `target/` content.
+- Do not revert unrelated user changes.
+- Keep commits and pull requests scoped to the requested change.
+
+## Final Checklist
+
+Before handing work back, confirm:
+
+- Relevant Maven verification passed, usually
+  `mvn -DskipTests clean compile`.
+- No unnecessary new build warnings were introduced.
+- `README.md` matches current behavior and configuration keys.
+- Generated files such as `target/` are not included.

@@ -1,108 +1,97 @@
-﻿# Keycloak AWS Identity Center Plugin
+# Keycloak AWS Identity Center Plugin
 
-A **Keycloak 26+** extension that enables:
-
--   AWS credential auto-detection (EC2, ECS, IRSA, local profiles)
--   Optional STS AssumeRole (configurable per realm)
--   Full synchronization with AWS IAM Identity Center via IdentityStore
-    API
--   Sync result statistics in API response
--   API rate limiting support
--   Automatic user update synchronization via Keycloak event listener
--   Realm-level configuration (multi-tenant ready)
-
-------------------------------------------------------------------------
-
-## Architecture Overview
-
-Admin UI / REST\
--> RealmResourceProvider\
--> AwsSyncService\
--> AWS SDK v2\
--> IAM Identity Center (IdentityStore API)
-
-------------------------------------------------------------------------
+A **Keycloak 26+** provider that synchronizes Keycloak users, groups, and
+memberships with AWS IAM Identity Center through the IdentityStore API.
 
 ## Features
 
-### 1. AWS Credentials Support
+- AWS credential auto-detection through AWS SDK v2
+- Optional STS AssumeRole, configurable per realm
+- Full synchronization with AWS IAM Identity Center
+- Sync result statistics in API responses
+- API rate limiting support
+- Automatic incremental synchronization through Keycloak event listeners
+- Realm-level configuration for multi-tenant deployments
 
-Uses AWS SDK v2 DefaultCredentialsProvider:
+## Architecture
 
--   EC2 Instance Role
--   ECS Task Role
--   EKS IRSA
--   Environment variables
--   \~/.aws/credentials
+```text
+REST endpoint
+  -> RealmResourceProvider
+  -> AwsSyncService
+  -> AWS SDK v2
+  -> IAM Identity Center IdentityStore API
+```
 
-Optional:
+## AWS Credentials
 
--   STS AssumeRole (configured per realm)
+The plugin uses the AWS SDK v2 `DefaultCredentialsProvider`, which supports:
 
-------------------------------------------------------------------------
+- EC2 instance roles
+- ECS task roles
+- EKS IRSA
+- Environment variables
+- Local `~/.aws/credentials` profiles
 
-### 2. Full Synchronization
+STS AssumeRole can also be enabled per realm with `aws.roleArn`.
 
--   Lists users from Identity Center
--   Creates or updates Keycloak users
--   Processes in batches of 30 users
--   Applies configurable rate limiting
--   Exposes real-time progress endpoint
+## Synchronization
 
-------------------------------------------------------------------------
+### Full Sync
 
-### 3. Event-Based Sync
+- Reads Keycloak users, groups, and group memberships
+- Creates or updates matching IAM Identity Center users and groups
+- Creates missing IAM Identity Center group memberships
+- Applies configurable API rate limiting
 
-When users, groups, or group memberships are changed in Keycloak, the plugin:
+### Event-Based Sync
 
--   Listens to admin user/group/group-membership events
--   Listens to user lifecycle events (for example registration/profile changes)
--   Triggers incremental sync for the affected user/group/membership only
+When users, groups, or group memberships change in Keycloak, the plugin:
 
-------------------------------------------------------------------------
+- Listens to admin user, group, and group-membership events
+- Listens to user lifecycle events, such as registration and profile changes
+- Triggers incremental synchronization for the affected user, group, or
+  membership
 
-### 4. Realm-Level Configuration
+## Realm Configuration
 
-Each realm can configure independently:
+Configuration values are stored as **realm attributes** in Keycloak and are
+persisted in the Keycloak database.
 
-  Key                   Description
-  --------------------- -----------------------------
-  aws.enabled           Enable sync for this realm (default: false)
-  aws.region            AWS Region
-  aws.roleArn           Optional AssumeRole ARN
-  aws.identityStoreId   Identity Center Instance ID
-  aws.maxQps            API rate limit
-  aws.userNameSource    UserName source for AWS (username|email)
+| Key | Required | Default | Description |
+| --- | --- | --- | --- |
+| `aws.enabled` | No | `false` | Enable synchronization for the realm |
+| `aws.region` | Yes | - | AWS Region |
+| `aws.identityStoreId` | Yes | - | IAM Identity Center identity store ID |
+| `aws.roleArn` | No | - | Optional STS AssumeRole ARN |
+| `aws.maxQps` | No | `5` | IdentityStore API rate limit |
+| `aws.userNameSource` | No | `username` | AWS username source: `username` or `email` |
 
-------------------------------------------------------------------------
+### UI Support
 
-## Updating Realm Configuration Values
+This provider does not include a Keycloak UI extension. Configuration and sync
+operations are supported through `kcadm`, Keycloak Admin REST API, and the
+provider REST endpoints only.
 
-These values are stored as **realm attributes** in Keycloak and are persisted
-in the Keycloak database.
-
-Keys used by this plugin:
-
--   `aws.enabled` (optional, default is `false`)
--   `aws.region` (required)
--   `aws.identityStoreId` (required)
--   `aws.roleArn` (optional)
--   `aws.maxQps` (optional, default is `5`)
--   `aws.userNameSource` (optional, `username` or `email`, default is `username`)
-
-**Note**: Web UI does not support to update the REALM attributes!!!!
+The Keycloak Admin Console does not provide a dedicated form for these custom
+realm attributes. Use `kcadm` or the Admin REST API to create and update the
+`aws.*` attributes.
 
 ### Update with `kcadm`
 
-``` bash
-# Login first
+Log in first:
+
+```bash
 bin/kcadm.sh config credentials \
   --server http://localhost:8080 \
   --realm master \
   --user admin \
   --password admin
+```
 
-# Update attributes in realm "myrealm"
+Update attributes in realm `myrealm`:
+
+```bash
 bin/kcadm.sh update realms/myrealm \
   -s 'attributes."aws.enabled"=true' \
   -s 'attributes."aws.region"=us-east-1' \
@@ -112,11 +101,15 @@ bin/kcadm.sh update realms/myrealm \
   -s 'attributes."aws.userNameSource"=username'
 ```
 
-**Using JSON File to Update**
+Verify the stored attributes:
 
-**For Windows OS, please use this way**
+```bash
+bin/kcadm.sh get realms/myrealm --fields attributes
+```
 
-Create following JSON file:
+### Update with JSON on Windows
+
+Create `update-realm.json`:
 
 ```json
 {
@@ -131,21 +124,15 @@ Create following JSON file:
 }
 ```
 
+Apply it:
+
 ```cmd
-kcadm.bat update realms/test -f update-realms.json
+kcadm.bat update realms/myrealm -f update-realm.json
 ```
-
-Verify:
-
-``` bash
-bin/kcadm.sh get realms/myrealm --fields attributes
-```
-
-------------------------------------------------------------------------
 
 ## Required AWS Permissions
 
-``` json
+```json
 {
   "Effect": "Allow",
   "Action": [
@@ -157,6 +144,8 @@ bin/kcadm.sh get realms/myrealm --fields attributes
     "identitystore:DeleteGroup",
     "identitystore:CreateGroupMembership",
     "identitystore:DeleteGroupMembership",
+    "identitystore:GetUserId",
+    "identitystore:GetGroupId",
     "identitystore:ListUsers",
     "identitystore:ListGroups",
     "identitystore:ListGroupMemberships"
@@ -165,113 +154,115 @@ bin/kcadm.sh get realms/myrealm --fields attributes
 }
 ```
 
-------------------------------------------------------------------------
-
-## Build Instructions
+## Build
 
 Requirements:
 
--   Java 17+
--   Maven 3.8+
--   Keycloak 26+
+- Java 21+
+- Maven 3.8+
+- Keycloak 26+
 
-Build:
+Compile:
 
-``` bash
-mvn "-Dkc.version=26.1.2" clean package
+```bash
+mvn -DskipTests clean compile
+```
+
+Package:
+
+```bash
+mvn -DskipTests clean package
+```
+
+Package with a specific Keycloak version:
+
+```bash
+mvn "-Dkc.version=26.1.2" -DskipTests clean package
 ```
 
 Output:
 
-    target/keycloak-aws-identitycenter-sync-<version>.jar
+```text
+target/keycloak-aws-identitycenter-sync-<version>.jar
+```
 
 GitHub Actions release build:
 
--   Workflow reads the GitHub Release tag (for example `v2.1.0`)
--   Tag value is passed into Maven as `-Drevision`
--   Final published JAR/version uses this release version (`2.1.0` in this example)
-
-------------------------------------------------------------------------
+- Workflow reads the GitHub Release tag, for example `v2.1.0`
+- The tag value is passed into Maven as `-Drevision`
+- The published JAR version uses this release version, for example `2.1.0`
 
 ## Installation
 
-1.  Copy the JAR into your Keycloak providers directory:
+Copy the JAR into the Keycloak providers directory:
 
-``` bash
+```bash
 cp target/*.jar /opt/keycloak/providers/
 ```
 
-2.  Rebuild Keycloak:
+Rebuild Keycloak:
 
-``` bash
+```bash
 bin/kc.sh build
 ```
 
-3.  Start Keycloak:
+Start Keycloak:
 
-``` bash
+```bash
 bin/kc.sh start
 ```
 
-4.  Enable event listener in realm settings:
+Enable the event listener for a realm:
 
--   Realm Settings -> Events -> Event Listeners
--   Add `aws-identitycenter-sync`
+```bash
+bin/kcadm.sh update events/config -r myrealm \
+  -s 'eventsListeners=["aws-identitycenter-sync"]' \
+  -s eventsEnabled=true \
+  -s adminEventsEnabled=true
+```
 
-------------------------------------------------------------------------
+If the realm already has event listeners, include the existing listener IDs in
+the `eventsListeners` array so they remain enabled.
 
 ## REST Endpoints
 
 ### Trigger Full Sync
 
+```http
 POST /realms/{realm}/aws-identitycenter-sync/full-sync
+```
 
-Requires:
+Requires a bearer token with the `realm-management/manage-users` role in the
+target realm.
 
--   Bearer token with `realm-management/manage-users` role in target realm
+Response fields:
 
-Returns JSON:
-
--   status (`success` or `partial_success`)
--   usersProcessed
--   groupsProcessed
--   usersFailed
--   groupsFailed
-
-------------------------------------------------------------------------
+- `status`: `success` or `partial_success`
+- `usersProcessed`
+- `groupsProcessed`
+- `membershipsProcessed`
+- `usersFailed`
+- `groupsFailed`
+- `membershipsFailed`
 
 ## Sync Behavior
 
--   Rate limiting via Guava RateLimiter
--   Synchronous request/response
--   Conflict errors are treated as already synchronized
+- Rate limiting is implemented with Guava `RateLimiter`
+- Full sync uses a synchronous request/response flow
+- Conflict errors are treated as already synchronized
 
-------------------------------------------------------------------------
+## Limitations
 
-## Limitations (Current Version)
-
--   No persistent job storage
--   No UI extension included (REST only)
-
-------------------------------------------------------------------------
+- No persistent job storage
+- No Keycloak UI extension
+- No Admin Console forms for plugin configuration
 
 ## Compatibility
 
--   Keycloak 26+
--   AWS SDK v2
--   IAM Identity Center IdentityStore API
-
-------------------------------------------------------------------------
+- Keycloak 26+
+- AWS SDK v2
+- IAM Identity Center IdentityStore API
 
 ## License
 
 Apache 2.0
-
-------------------------------------------------------------------------
-
-
-
-
-
-
-

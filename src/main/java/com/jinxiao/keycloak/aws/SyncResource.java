@@ -36,8 +36,10 @@ public class SyncResource {
         payload.put("status", result.hasFailures() ? "partial_success" : "success");
         payload.put("usersProcessed", result.usersProcessed());
         payload.put("groupsProcessed", result.groupsProcessed());
+        payload.put("membershipsProcessed", result.membershipsProcessed());
         payload.put("usersFailed", result.usersFailed());
         payload.put("groupsFailed", result.groupsFailed());
+        payload.put("membershipsFailed", result.membershipsFailed());
         return Response.ok(payload).build();
     }
 

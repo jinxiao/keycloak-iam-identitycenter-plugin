@@ -1,0 +1,177 @@
+<mxfile host="app.diagrams.net" modified="2026-04-30T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="keycloak-aws-identitycenter-sync-flow" name="Identity Center Sync Flow">
+    <mxGraphModel dx="1700" dy="1150" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1220" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Keycloak AWS Identity Center Sync Flow" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="390" y="20" width="820" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lane-rest" value="REST full sync path" style="swimlane;html=1;startSize=34;rounded=0;fillColor=#f8fbff;strokeColor=#6c8ebf;fontStyle=1;fontSize=14" vertex="1" parent="1">
+          <mxGeometry x="40" y="90" width="700" height="620" as="geometry" />
+        </mxCell>
+        <mxCell id="lane-event" value="Event-driven incremental sync path" style="swimlane;html=1;startSize=34;rounded=0;fillColor=#fffaf2;strokeColor=#d6b656;fontStyle=1;fontSize=14" vertex="1" parent="1">
+          <mxGeometry x="820" y="90" width="700" height="620" as="geometry" />
+        </mxCell>
+        <mxCell id="shared" value="Shared synchronization core and AWS interactions" style="swimlane;html=1;startSize=34;rounded=0;fillColor=#f7fff7;strokeColor=#82b366;fontStyle=1;fontSize=14" vertex="1" parent="1">
+          <mxGeometry x="120" y="750" width="1450" height="420" as="geometry" />
+        </mxCell>
+
+        <mxCell id="rest-start" value="POST /realms/{realm}/aws-identitycenter-sync/full-sync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="90" y="145" width="250" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="provider" value="AwsIdentityCenterProviderFactory&lt;br&gt;id: aws-identitycenter-sync&lt;br&gt;creates AwsIdentityCenterProvider" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eaf3ff;strokeColor=#6c8ebf" vertex="1" parent="1">
+          <mxGeometry x="420" y="145" width="250" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="sync-resource" value="SyncResource.fullSync()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eaf3ff;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="250" y="250" width="230" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="auth" value="Bearer token authentication&lt;br&gt;requires realm-management/manage-users" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="255" y="345" width="220" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="auth-fail" value="401 NotAuthorized&lt;br&gt;or 403 Forbidden" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450" vertex="1" parent="1">
+          <mxGeometry x="535" y="370" width="145" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="enabled" value="AwsConfig.isEnabled(realm)&lt;br&gt;aws.enabled == true?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="255" y="500" width="220" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="disabled" value="403 Forbidden&lt;br&gt;sync disabled" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450" vertex="1" parent="1">
+          <mxGeometry x="535" y="525" width="145" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="full-sync" value="IdentityCenterSyncManager.fullSync(session, realm)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="250" y="640" width="230" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="event-spi" value="IdentityCenterEventListenerFactory&lt;br&gt;id: aws-identitycenter-sync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="870" y="145" width="250" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="events" value="Keycloak events" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7df;strokeColor=#d6b656;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1220" y="145" width="230" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="event-types" value="User events&lt;br&gt;REGISTER, UPDATE_PROFILE,&lt;br&gt;UPDATE_EMAIL, UPDATE_PASSWORD,&lt;br&gt;DELETE_ACCOUNT&lt;br&gt;&lt;br&gt;Admin events&lt;br&gt;USER, GROUP, GROUP_MEMBERSHIP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7df;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="1015" y="250" width="280" height="145" as="geometry" />
+        </mxCell>
+        <mxCell id="resolve-realm" value="resolveRealm(event.realmId)&lt;br&gt;then check aws.enabled" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="1045" y="445" width="220" height="115" as="geometry" />
+        </mxCell>
+        <mxCell id="event-skip" value="Skip event&lt;br&gt;null, unsupported type,&lt;br&gt;or sync disabled" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#999999" vertex="1" parent="1">
+          <mxGeometry x="1320" y="470" width="155" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="route" value="Route by resource and operation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7df;strokeColor=#d6b656;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1040" y="620" width="230" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="event-actions" value="syncSingleUser / deleteSingleUser&lt;br&gt;syncSingleGroup / deleteSingleGroup&lt;br&gt;syncSingleGroupMembership / deleteSingleGroupMembership" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="880" y="690" width="550" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="load-config" value="AwsConfig.fromRealm(realm)&lt;br&gt;region, identityStoreId, roleArn,&lt;br&gt;maxQps, userNameSource" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="170" y="820" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="client-factory" value="AwsClientFactory.create(config)&lt;br&gt;DefaultCredentialsProvider&lt;br&gt;optional STS AssumeRole&lt;br&gt;IdentitystoreClient" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="500" y="815" width="250" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-boundary" value="AWS account / configured region" style="swimlane;html=1;startSize=28;rounded=0;fillColor=#fff7ed;strokeColor=#f58536;fontStyle=1;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="800" y="790" width="730" height="335" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-iam-creds" value="AWS credentials&lt;br&gt;EC2 / ECS / IRSA&lt;br&gt;env / profile" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#F54749;gradientDirection=north;fillColor=#DD344C;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.identity_and_access_management;" vertex="1" parent="1">
+          <mxGeometry x="845" y="835" width="88" height="88" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-sts" value="AWS STS&lt;br&gt;AssumeRole&lt;br&gt;(if roleArn set)" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#DD344C;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.sts;" vertex="1" parent="1">
+          <mxGeometry x="1025" y="835" width="88" height="88" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-temp-creds" value="temporary role&lt;br&gt;credentials" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#DD344C;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.temporary_security_credential;" vertex="1" parent="1">
+          <mxGeometry x="1205" y="835" width="88" height="88" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-identity-center" value="IAM Identity Center&lt;br&gt;IdentityStore API" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#F54749;gradientDirection=north;fillColor=#DD344C;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.single_sign_on;" vertex="1" parent="1">
+          <mxGeometry x="1385" y="835" width="88" height="88" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-api-ops" value="IdentityStore API calls&lt;br&gt;CreateUser / UpdateUser / DeleteUser&lt;br&gt;CreateGroup / UpdateGroup / DeleteGroup&lt;br&gt;CreateGroupMembership / DeleteGroupMembership&lt;br&gt;GetUserId / GetGroupId / ListGroupMemberships" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#f58536;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="955" y="1015" width="390" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="result" value="Return result&lt;br&gt;success or partial_success&lt;br&gt;processed and failed counts&lt;br&gt;&lt;br&gt;Incremental path logs failures" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666" vertex="1" parent="1">
+          <mxGeometry x="500" y="1020" width="260" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e1" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=2" edge="1" parent="1" source="rest-start" target="sync-resource">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="SPI registration" style="endArrow=block;html=1;rounded=0;strokeWidth=2" edge="1" parent="1" source="provider" target="sync-resource">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=2" edge="1" parent="1" source="sync-resource" target="auth">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="No" style="endArrow=block;html=1;rounded=0;strokeColor=#b85450" edge="1" parent="1" source="auth" target="auth-fail">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="Yes" style="endArrow=block;html=1;rounded=0;strokeWidth=2" edge="1" parent="1" source="auth" target="enabled">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="No" style="endArrow=block;html=1;rounded=0;strokeColor=#b85450" edge="1" parent="1" source="enabled" target="disabled">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="Yes" style="endArrow=block;html=1;rounded=0;strokeWidth=2" edge="1" parent="1" source="enabled" target="full-sync">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=2" edge="1" parent="1" source="event-spi" target="event-types">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=2" edge="1" parent="1" source="events" target="event-types">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=2" edge="1" parent="1" source="event-types" target="resolve-realm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="Skip" style="endArrow=block;html=1;rounded=0;strokeColor=#666666" edge="1" parent="1" source="resolve-realm" target="event-skip">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="Enabled" style="endArrow=block;html=1;rounded=0;strokeWidth=2" edge="1" parent="1" source="resolve-realm" target="route">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=2" edge="1" parent="1" source="route" target="event-actions">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e14" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=2" edge="1" parent="1" source="full-sync" target="load-config">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e15" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=2" edge="1" parent="1" source="event-actions" target="load-config">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e16" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=2" edge="1" parent="1" source="load-config" target="client-factory">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e17" value="resolve base credentials" style="endArrow=block;html=1;rounded=0;strokeWidth=2" edge="1" parent="1" source="client-factory" target="aws-iam-creds">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e18" value="roleArn present" style="endArrow=block;html=1;rounded=0;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="aws-iam-creds" target="aws-sts">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e19" value="AssumeRole" style="endArrow=block;html=1;rounded=0;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="aws-sts" target="aws-temp-creds">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e20" value="sign requests" style="endArrow=block;html=1;rounded=0;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="aws-temp-creds" target="aws-identity-center">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e21" value="no roleArn: use base credentials" style="endArrow=block;html=1;rounded=0;strokeWidth=2;dashed=1;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="aws-iam-creds" target="aws-identity-center">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="889" y="975" />
+              <mxPoint x="1429" y="975" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e22" value="Create / Update / Delete / Get / List" style="endArrow=block;html=1;rounded=0;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="aws-identity-center" target="aws-api-ops">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e23" value="Conflict =&gt; update existing&lt;br&gt;not found on delete =&gt; success" style="endArrow=block;html=1;rounded=0;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="aws-api-ops" target="result">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1150" y="1140" />
+              <mxPoint x="630" y="1140" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

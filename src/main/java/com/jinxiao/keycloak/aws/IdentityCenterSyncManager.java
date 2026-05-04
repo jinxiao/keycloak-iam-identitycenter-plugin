@@ -17,7 +17,6 @@ import software.amazon.awssdk.services.identitystore.model.DeleteGroupRequest;
 import software.amazon.awssdk.services.identitystore.model.DeleteUserRequest;
 import software.amazon.awssdk.services.identitystore.model.GetGroupIdRequest;
 import software.amazon.awssdk.services.identitystore.model.GetUserIdRequest;
-import software.amazon.awssdk.services.identitystore.model.Group;
 import software.amazon.awssdk.services.identitystore.model.GroupMembership;
 import software.amazon.awssdk.services.identitystore.model.ListGroupMembershipsRequest;
 import software.amazon.awssdk.services.identitystore.model.ListGroupMembershipsResponse;
@@ -26,10 +25,11 @@ import software.amazon.awssdk.services.identitystore.model.ResourceNotFoundExcep
 import software.amazon.awssdk.services.identitystore.model.UpdateGroupRequest;
 import software.amazon.awssdk.services.identitystore.model.UpdateUserRequest;
 import software.amazon.awssdk.services.identitystore.model.UniqueAttribute;
-import software.amazon.awssdk.services.identitystore.model.User;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -42,11 +42,15 @@ public class IdentityCenterSyncManager {
         int groupsProcessed = 0;
         int usersFailed = 0;
         int groupsFailed = 0;
+        int membershipsProcessed = 0;
+        int membershipsFailed = 0;
         AwsConfig config = AwsConfig.fromRealm(realm);
         RateLimiter limiter = RateLimiter.create((double) config.maxQps);
+        List<UserModel> users = session.users().searchForUserStream(realm, Collections.emptyMap(), null, null).toList();
+        List<GroupModel> groups = listAllGroups(realm);
 
         try (AwsClientFactory.AwsClients clients = AwsClientFactory.create(config)) {
-            for (UserModel user : session.users().searchForUserStream(realm, Collections.emptyMap(), null, null).toList()) {
+            for (UserModel user : users) {
                 limiter.acquire();
                 usersProcessed++;
                 if (!upsertUser(clients.identitystore(), config, user)) {
@@ -54,16 +58,26 @@ public class IdentityCenterSyncManager {
                 }
             }
 
-            for (GroupModel group : realm.getGroupsStream().toList()) {
+            for (GroupModel group : groups) {
                 limiter.acquire();
                 groupsProcessed++;
                 if (!upsertGroup(clients.identitystore(), config.identityStoreId, group)) {
                     groupsFailed++;
                 }
             }
+
+            for (UserModel user : users) {
+                for (GroupModel group : user.getGroupsStream().toList()) {
+                    limiter.acquire();
+                    membershipsProcessed++;
+                    if (!upsertGroupMembership(clients.identitystore(), config, user, group)) {
+                        membershipsFailed++;
+                    }
+                }
+            }
         }
 
-        return new SyncResult(usersProcessed, groupsProcessed, usersFailed, groupsFailed);
+        return new SyncResult(usersProcessed, groupsProcessed, membershipsProcessed, usersFailed, groupsFailed, membershipsFailed);
     }
 
     public boolean syncSingleUser(KeycloakSession session, RealmModel realm, String userId) {
@@ -113,27 +127,35 @@ public class IdentityCenterSyncManager {
 
         AwsConfig config = AwsConfig.fromRealm(realm);
         try (AwsClientFactory.AwsClients clients = AwsClientFactory.create(config)) {
-            String awsUserId = resolveAwsUserId(clients.identitystore(), config, user);
-            String awsGroupId = findGroupIdByDisplayName(clients.identitystore(), config.identityStoreId, group.getName());
-            if (awsUserId == null || awsGroupId == null) {
-                LOG.warning(String.format("Cannot resolve AWS membership targets. realm=%s userId=%s groupId=%s",
-                        realm.getName(), userId, groupId));
-                return false;
-            }
-
-            try {
-                clients.identitystore().createGroupMembership(CreateGroupMembershipRequest.builder()
-                        .identityStoreId(config.identityStoreId)
-                        .groupId(awsGroupId)
-                        .memberId(MemberId.builder().userId(awsUserId).build())
-                        .build());
-                return true;
-            } catch (ConflictException e) {
-                return true;
-            }
+            return upsertGroupMembership(clients.identitystore(), config, user, group);
         } catch (Exception e) {
             LOG.log(Level.SEVERE, String.format("Failed to sync membership to Identity Center. realm=%s userId=%s groupId=%s",
                     realm.getName(), userId, groupId), e);
+            return false;
+        }
+    }
+
+    private boolean upsertGroupMembership(IdentitystoreClient client, AwsConfig config, UserModel user, GroupModel group) {
+        String awsUserId = resolveAwsUserId(client, config, user);
+        String awsGroupId = findGroupIdByDisplayName(client, config.identityStoreId, group.getName());
+        if (awsUserId == null || awsGroupId == null) {
+            LOG.warning(String.format("Cannot resolve AWS membership targets. userId=%s groupId=%s",
+                    user.getId(), group.getId()));
+            return false;
+        }
+
+        try {
+            client.createGroupMembership(CreateGroupMembershipRequest.builder()
+                    .identityStoreId(config.identityStoreId)
+                    .groupId(awsGroupId)
+                    .memberId(MemberId.builder().userId(awsUserId).build())
+                    .build());
+            return true;
+        } catch (ConflictException e) {
+            return true;
+        } catch (Exception e) {
+            LOG.log(Level.SEVERE, String.format("Failed to sync membership to Identity Center. userId=%s groupId=%s",
+                    user.getId(), group.getId()), e);
             return false;
         }
     }
@@ -412,6 +434,21 @@ public class IdentityCenterSyncManager {
         return null;
     }
 
+    private List<GroupModel> listAllGroups(RealmModel realm) {
+        List<GroupModel> groups = new ArrayList<>();
+        Set<String> seenGroupIds = new LinkedHashSet<>();
+        realm.getGroupsStream().forEach(group -> collectGroup(groups, seenGroupIds, group));
+        return groups;
+    }
+
+    private void collectGroup(List<GroupModel> groups, Set<String> seenGroupIds, GroupModel group) {
+        if (!seenGroupIds.add(group.getId())) {
+            return;
+        }
+        groups.add(group);
+        group.getSubGroupsStream().forEach(subGroup -> collectGroup(groups, seenGroupIds, subGroup));
+    }
+
     private String resolveAwsUserName(UserModel user, AwsConfig.UserNameSource source) {
         String primary = source == AwsConfig.UserNameSource.EMAIL ? user.getEmail() : user.getUsername();
         String fallback = source == AwsConfig.UserNameSource.EMAIL ? user.getUsername() : user.getEmail();
@@ -447,11 +484,13 @@ public class IdentityCenterSyncManager {
     public record SyncResult(
             int usersProcessed,
             int groupsProcessed,
+            int membershipsProcessed,
             int usersFailed,
-            int groupsFailed
+            int groupsFailed,
+            int membershipsFailed
     ) {
         public boolean hasFailures() {
-            return usersFailed > 0 || groupsFailed > 0;
+            return usersFailed > 0 || groupsFailed > 0 || membershipsFailed > 0;
         }
     }
 }
