@@ -60,7 +60,7 @@ public class SyncResource {
         }
 
         RoleModel manageUsersRole = realmManagement.getRole(AdminRoles.MANAGE_USERS);
-        if (manageUsersRole == null || !auth.getUser().hasRole(manageUsersRole)) {
+        if (manageUsersRole == null || !auth.user().hasRole(manageUsersRole)) {
             throw new ForbiddenException("manage-users role is required");
         }
     }
