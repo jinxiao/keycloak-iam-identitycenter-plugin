@@ -1,6 +1,5 @@
 package com.jinxiao.keycloak.aws;
 
-import com.google.common.util.concurrent.RateLimiter;
 import org.keycloak.models.GroupModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
@@ -37,13 +36,19 @@ import java.util.logging.Logger;
 public class IdentityCenterSyncManager {
     private static final Logger LOG = Logger.getLogger(IdentityCenterSyncManager.class.getName());
     private final AwsClientsFactory clientsFactory;
+    private final AwsLimiterFactory limiterFactory;
 
     public IdentityCenterSyncManager() {
         this(AwsClientFactory::create);
     }
 
     IdentityCenterSyncManager(AwsClientsFactory clientsFactory) {
+        this(clientsFactory, AwsApiRateLimiter::create);
+    }
+
+    IdentityCenterSyncManager(AwsClientsFactory clientsFactory, AwsLimiterFactory limiterFactory) {
         this.clientsFactory = clientsFactory;
+        this.limiterFactory = limiterFactory;
     }
 
     public SyncResult fullSync(KeycloakSession session, RealmModel realm) {
@@ -54,32 +59,29 @@ public class IdentityCenterSyncManager {
         int membershipsProcessed = 0;
         int membershipsFailed = 0;
         AwsConfig config = AwsConfig.fromRealm(realm);
-        RateLimiter limiter = RateLimiter.create((double) config.maxQps);
+        AwsApiLimiter limiter = limiterFactory.create(config.maxQps);
         List<UserModel> users = session.users().searchForUserStream(realm, Collections.emptyMap(), null, null).toList();
         List<GroupModel> groups = listAllGroups(realm);
 
         try (AwsClientFactory.AwsClients clients = clientsFactory.create(config)) {
             for (UserModel user : users) {
-                limiter.acquire();
                 usersProcessed++;
-                if (!upsertUser(clients.identitystore(), config, user)) {
+                if (!upsertUser(clients.identitystore(), config, limiter, user)) {
                     usersFailed++;
                 }
             }
 
             for (GroupModel group : groups) {
-                limiter.acquire();
                 groupsProcessed++;
-                if (!upsertGroup(clients.identitystore(), config.identityStoreId, group)) {
+                if (!upsertGroup(clients.identitystore(), config.identityStoreId, limiter, group)) {
                     groupsFailed++;
                 }
             }
 
             for (UserModel user : users) {
                 for (GroupModel group : user.getGroupsStream().toList()) {
-                    limiter.acquire();
                     membershipsProcessed++;
-                    if (!upsertGroupMembership(clients.identitystore(), config, user, group)) {
+                    if (!upsertGroupMembership(clients.identitystore(), config, limiter, user, group)) {
                         membershipsFailed++;
                     }
                 }
@@ -100,8 +102,9 @@ public class IdentityCenterSyncManager {
         }
 
         AwsConfig config = AwsConfig.fromRealm(realm);
+        AwsApiLimiter limiter = limiterFactory.create(config.maxQps);
         try (AwsClientFactory.AwsClients clients = clientsFactory.create(config)) {
-            return upsertUser(clients.identitystore(), config, user);
+            return upsertUser(clients.identitystore(), config, limiter, user);
         }
     }
 
@@ -116,8 +119,9 @@ public class IdentityCenterSyncManager {
         }
 
         AwsConfig config = AwsConfig.fromRealm(realm);
+        AwsApiLimiter limiter = limiterFactory.create(config.maxQps);
         try (AwsClientFactory.AwsClients clients = clientsFactory.create(config)) {
-            return upsertGroup(clients.identitystore(), config.identityStoreId, group);
+            return upsertGroup(clients.identitystore(), config.identityStoreId, limiter, group);
         }
     }
 
@@ -135,8 +139,9 @@ public class IdentityCenterSyncManager {
         }
 
         AwsConfig config = AwsConfig.fromRealm(realm);
+        AwsApiLimiter limiter = limiterFactory.create(config.maxQps);
         try (AwsClientFactory.AwsClients clients = clientsFactory.create(config)) {
-            return upsertGroupMembership(clients.identitystore(), config, user, group);
+            return upsertGroupMembership(clients.identitystore(), config, limiter, user, group);
         } catch (Exception e) {
             LOG.log(Level.SEVERE, String.format("Failed to sync membership to Identity Center. realm=%s userId=%s groupId=%s",
                     realm.getName(), userId, groupId), e);
@@ -144,9 +149,15 @@ public class IdentityCenterSyncManager {
         }
     }
 
-    private boolean upsertGroupMembership(IdentitystoreClient client, AwsConfig config, UserModel user, GroupModel group) {
-        String awsUserId = resolveAwsUserId(client, config, user);
-        String awsGroupId = findGroupIdByDisplayName(client, config.identityStoreId, group.getName());
+    private boolean upsertGroupMembership(
+            IdentitystoreClient client,
+            AwsConfig config,
+            AwsApiLimiter limiter,
+            UserModel user,
+            GroupModel group
+    ) {
+        String awsUserId = resolveAwsUserId(client, config, limiter, user);
+        String awsGroupId = findGroupIdByDisplayName(client, config.identityStoreId, limiter, group.getName());
         if (awsUserId == null || awsGroupId == null) {
             LOG.warning(String.format("Cannot resolve AWS membership targets. userId=%s groupId=%s",
                     user.getId(), group.getId()));
@@ -154,11 +165,11 @@ public class IdentityCenterSyncManager {
         }
 
         try {
-            client.createGroupMembership(CreateGroupMembershipRequest.builder()
-                    .identityStoreId(config.identityStoreId)
-                    .groupId(awsGroupId)
-                    .memberId(MemberId.builder().userId(awsUserId).build())
-                    .build());
+            callAws(limiter, () -> client.createGroupMembership(CreateGroupMembershipRequest.builder()
+                            .identityStoreId(config.identityStoreId)
+                            .groupId(awsGroupId)
+                            .memberId(MemberId.builder().userId(awsUserId).build())
+                            .build()));
             return true;
         } catch (ConflictException e) {
             return true;
@@ -183,24 +194,25 @@ public class IdentityCenterSyncManager {
         }
 
         AwsConfig config = AwsConfig.fromRealm(realm);
+        AwsApiLimiter limiter = limiterFactory.create(config.maxQps);
         try (AwsClientFactory.AwsClients clients = clientsFactory.create(config)) {
-            String awsUserId = resolveAwsUserId(clients.identitystore(), config, user);
-            String awsGroupId = findGroupIdByDisplayName(clients.identitystore(), config.identityStoreId, group.getName());
+            String awsUserId = resolveAwsUserId(clients.identitystore(), config, limiter, user);
+            String awsGroupId = findGroupIdByDisplayName(clients.identitystore(), config.identityStoreId, limiter, group.getName());
             if (awsUserId == null || awsGroupId == null) {
                 LOG.warning(String.format("Cannot resolve AWS membership targets for delete. realm=%s userId=%s groupId=%s",
                         realm.getName(), userId, groupId));
                 return false;
             }
 
-            String membershipId = findMembershipId(clients.identitystore(), config.identityStoreId, awsGroupId, awsUserId);
+            String membershipId = findMembershipId(clients.identitystore(), config.identityStoreId, limiter, awsGroupId, awsUserId);
             if (membershipId == null) {
                 return true;
             }
 
-            clients.identitystore().deleteGroupMembership(DeleteGroupMembershipRequest.builder()
-                    .identityStoreId(config.identityStoreId)
-                    .membershipId(membershipId)
-                    .build());
+            callAws(limiter, () -> clients.identitystore().deleteGroupMembership(DeleteGroupMembershipRequest.builder()
+                            .identityStoreId(config.identityStoreId)
+                            .membershipId(membershipId)
+                            .build()));
             return true;
         } catch (Exception e) {
             LOG.log(Level.SEVERE, String.format("Failed to delete membership in Identity Center. realm=%s userId=%s groupId=%s",
@@ -233,11 +245,12 @@ public class IdentityCenterSyncManager {
             return false;
         }
 
+        AwsApiLimiter limiter = limiterFactory.create(config.maxQps);
         try (AwsClientFactory.AwsClients clients = clientsFactory.create(config)) {
             String existingUserId = null;
             String matchedUserName = null;
             for (String candidate : userNameCandidates) {
-                existingUserId = findUserIdByUserName(clients.identitystore(), config.identityStoreId, candidate);
+                existingUserId = findUserIdByUserName(clients.identitystore(), config.identityStoreId, limiter, candidate);
                 if (existingUserId != null) {
                     matchedUserName = candidate;
                     break;
@@ -249,10 +262,10 @@ public class IdentityCenterSyncManager {
                 return true;
             }
 
-            clients.identitystore().deleteUser(DeleteUserRequest.builder()
-                    .identityStoreId(config.identityStoreId)
-                    .userId(existingUserId)
-                    .build());
+            callAws(limiter, () -> clients.identitystore().deleteUser(DeleteUserRequest.builder()
+                            .identityStoreId(config.identityStoreId)
+                            .userId(existingUserId)
+                            .build()));
             LOG.fine(String.format("Deleted user in Identity Center. realm=%s username=%s", realm.getName(), matchedUserName));
             return true;
         } catch (Exception e) {
@@ -275,16 +288,17 @@ public class IdentityCenterSyncManager {
         }
 
         AwsConfig config = AwsConfig.fromRealm(realm);
+        AwsApiLimiter limiter = limiterFactory.create(config.maxQps);
         try (AwsClientFactory.AwsClients clients = clientsFactory.create(config)) {
-            String existingGroupId = findGroupIdByDisplayName(clients.identitystore(), config.identityStoreId, groupName);
+            String existingGroupId = findGroupIdByDisplayName(clients.identitystore(), config.identityStoreId, limiter, groupName);
             if (existingGroupId == null) {
                 LOG.fine(String.format("Group not found in Identity Center, skip delete. realm=%s group=%s", realm.getName(), groupName));
                 return true;
             }
-            clients.identitystore().deleteGroup(DeleteGroupRequest.builder()
-                    .identityStoreId(config.identityStoreId)
-                    .groupId(existingGroupId)
-                    .build());
+            callAws(limiter, () -> clients.identitystore().deleteGroup(DeleteGroupRequest.builder()
+                            .identityStoreId(config.identityStoreId)
+                            .groupId(existingGroupId)
+                            .build()));
             return true;
         } catch (Exception e) {
             LOG.log(Level.SEVERE, String.format("Failed to delete group from Identity Center: %s", groupName), e);
@@ -292,7 +306,7 @@ public class IdentityCenterSyncManager {
         }
     }
 
-    private boolean upsertUser(IdentitystoreClient client, AwsConfig config, UserModel user) {
+    private boolean upsertUser(IdentitystoreClient client, AwsConfig config, AwsApiLimiter limiter, UserModel user) {
         String awsUserName = resolveAwsUserName(user, config.userNameSource);
         if (awsUserName == null) {
             LOG.warning(String.format("Cannot resolve aws username. realmUserId=%s source=%s", user.getId(), config.userNameSource));
@@ -306,50 +320,56 @@ public class IdentityCenterSyncManager {
                 .displayName(displayName)
                 .build();
         try {
-            client.createUser(request);
+            callAws(limiter, () -> client.createUser(request));
             return true;
         } catch (ConflictException e) {
-            return updateExistingUser(client, config.identityStoreId, awsUserName, displayName);
+            return updateExistingUser(client, config.identityStoreId, limiter, awsUserName, displayName);
         } catch (Exception e) {
             LOG.log(Level.SEVERE, String.format("Failed to sync user to Identity Center: %s", awsUserName), e);
             return false;
         }
     }
 
-    private boolean upsertGroup(IdentitystoreClient client, String storeId, GroupModel group) {
+    private boolean upsertGroup(IdentitystoreClient client, String storeId, AwsApiLimiter limiter, GroupModel group) {
         CreateGroupRequest request = CreateGroupRequest.builder()
                 .identityStoreId(storeId)
                 .displayName(group.getName())
                 .build();
         try {
-            client.createGroup(request);
+            callAws(limiter, () -> client.createGroup(request));
             return true;
         } catch (ConflictException e) {
-            return updateExistingGroup(client, storeId, group.getName());
+            return updateExistingGroup(client, storeId, limiter, group.getName());
         } catch (Exception e) {
             LOG.log(Level.SEVERE, String.format("Failed to sync group to Identity Center: %s", group.getName()), e);
             return false;
         }
     }
 
-    private boolean updateExistingUser(IdentitystoreClient client, String storeId, String username, String displayName) {
-        String existingUserId = findUserIdByUserName(client, storeId, username);
+    private boolean updateExistingUser(
+            IdentitystoreClient client,
+            String storeId,
+            AwsApiLimiter limiter,
+            String username,
+            String displayName
+    ) {
+        String existingUserId = findUserIdByUserName(client, storeId, limiter, username);
         if (existingUserId == null) {
             LOG.warning(String.format("User conflict but no existing user found. username=%s", username));
             return false;
         }
 
         try {
-            client.updateUser(UpdateUserRequest.builder()
-                    .identityStoreId(storeId)
-                    .userId(existingUserId)
-                    .operations(
-                            AttributeOperation.builder()
-                                    .attributePath("DisplayName")
-                                    .attributeValue(Document.fromString(displayName))
-                                    .build()
-                    )
-                    .build());
+            callAws(limiter, () -> client.updateUser(UpdateUserRequest.builder()
+                            .identityStoreId(storeId)
+                            .userId(existingUserId)
+                            .operations(
+                                    AttributeOperation.builder()
+                                            .attributePath("DisplayName")
+                                            .attributeValue(Document.fromString(displayName))
+                                            .build()
+                            )
+                            .build()));
             return true;
         } catch (Exception e) {
             LOG.log(Level.SEVERE, String.format("Failed to update existing user in Identity Center: %s", username), e);
@@ -357,24 +377,24 @@ public class IdentityCenterSyncManager {
         }
     }
 
-    private boolean updateExistingGroup(IdentitystoreClient client, String storeId, String groupName) {
-        String existingGroupId = findGroupIdByDisplayName(client, storeId, groupName);
+    private boolean updateExistingGroup(IdentitystoreClient client, String storeId, AwsApiLimiter limiter, String groupName) {
+        String existingGroupId = findGroupIdByDisplayName(client, storeId, limiter, groupName);
         if (existingGroupId == null) {
             LOG.warning(String.format("Group conflict but no existing group found. group=%s", groupName));
             return false;
         }
 
         try {
-            client.updateGroup(UpdateGroupRequest.builder()
-                    .identityStoreId(storeId)
-                    .groupId(existingGroupId)
-                    .operations(
-                            AttributeOperation.builder()
-                                    .attributePath("DisplayName")
-                                    .attributeValue(Document.fromString(groupName))
-                                    .build()
-                    )
-                    .build());
+            callAws(limiter, () -> client.updateGroup(UpdateGroupRequest.builder()
+                            .identityStoreId(storeId)
+                            .groupId(existingGroupId)
+                            .operations(
+                                    AttributeOperation.builder()
+                                            .attributePath("DisplayName")
+                                            .attributeValue(Document.fromString(groupName))
+                                            .build()
+                            )
+                            .build()));
             return true;
         } catch (Exception e) {
             LOG.log(Level.SEVERE, String.format("Failed to update existing group in Identity Center: %s", groupName), e);
@@ -382,64 +402,77 @@ public class IdentityCenterSyncManager {
         }
     }
 
-    private String resolveAwsUserId(IdentitystoreClient client, AwsConfig config, UserModel user) {
+    private String resolveAwsUserId(IdentitystoreClient client, AwsConfig config, AwsApiLimiter limiter, UserModel user) {
         String userName = resolveAwsUserName(user, config.userNameSource);
         if (isBlank(userName)) {
             return null;
         }
-        return findUserIdByUserName(client, config.identityStoreId, userName);
+        return findUserIdByUserName(client, config.identityStoreId, limiter, userName);
     }
 
-    private String findUserIdByUserName(IdentitystoreClient client, String storeId, String username) {
+    private String findUserIdByUserName(IdentitystoreClient client, String storeId, AwsApiLimiter limiter, String username) {
         if (username == null || username.isBlank()) {
             return null;
         }
         try {
-            return client.getUserId(GetUserIdRequest.builder()
-                            .identityStoreId(storeId)
-                            .alternateIdentifier(builder -> builder.uniqueAttribute(UniqueAttribute.builder()
-                                    .attributePath("UserName")
-                                    .attributeValue(Document.fromString(username))
+            return callAws(limiter, () -> client.getUserId(GetUserIdRequest.builder()
+                                    .identityStoreId(storeId)
+                                    .alternateIdentifier(builder -> builder.uniqueAttribute(UniqueAttribute.builder()
+                                            .attributePath("UserName")
+                                            .attributeValue(Document.fromString(username))
+                                            .build()))
                                     .build()))
-                            .build())
                     .userId();
         } catch (ResourceNotFoundException e) {
             return null;
         }
     }
 
-    private String findGroupIdByDisplayName(IdentitystoreClient client, String storeId, String displayName) {
+    private String findGroupIdByDisplayName(IdentitystoreClient client, String storeId, AwsApiLimiter limiter, String displayName) {
         if (displayName == null || displayName.isBlank()) {
             return null;
         }
         try {
-            return client.getGroupId(GetGroupIdRequest.builder()
-                            .identityStoreId(storeId)
-                            .alternateIdentifier(builder -> builder.uniqueAttribute(UniqueAttribute.builder()
-                                    .attributePath("DisplayName")
-                                    .attributeValue(Document.fromString(displayName))
+            return callAws(limiter, () -> client.getGroupId(GetGroupIdRequest.builder()
+                                    .identityStoreId(storeId)
+                                    .alternateIdentifier(builder -> builder.uniqueAttribute(UniqueAttribute.builder()
+                                            .attributePath("DisplayName")
+                                            .attributeValue(Document.fromString(displayName))
+                                            .build()))
                                     .build()))
-                            .build())
                     .groupId();
         } catch (ResourceNotFoundException e) {
             return null;
         }
     }
 
-    private String findMembershipId(IdentitystoreClient client, String storeId, String groupId, String userId) {
+    private String findMembershipId(
+            IdentitystoreClient client,
+            String storeId,
+            AwsApiLimiter limiter,
+            String groupId,
+            String userId
+    ) {
         ListGroupMembershipsRequest request = ListGroupMembershipsRequest.builder()
                 .identityStoreId(storeId)
                 .groupId(groupId)
                 .build();
+        String nextToken = null;
 
-        for (ListGroupMembershipsResponse page : client.listGroupMembershipsPaginator(request)) {
+        do {
+            ListGroupMembershipsRequest pageRequest = nextToken == null
+                    ? request
+                    : request.toBuilder().nextToken(nextToken).build();
+            ListGroupMembershipsResponse page = callAws(limiter, () -> client.listGroupMemberships(pageRequest));
             for (GroupMembership membership : page.groupMemberships()) {
                 MemberId member = membership.memberId();
                 if (member != null && userId.equals(member.userId())) {
                     return membership.membershipId();
                 }
             }
-        }
+            nextToken = page.nextToken();
+        } while (nextToken != null && !nextToken.isBlank());
+
         return null;
     }
 
@@ -506,5 +539,20 @@ public class IdentityCenterSyncManager {
     @FunctionalInterface
     interface AwsClientsFactory {
         AwsClientFactory.AwsClients create(AwsConfig config);
+    }
+
+    @FunctionalInterface
+    interface AwsLimiterFactory {
+        AwsApiLimiter create(int maxQps);
+    }
+
+    private <T> T callAws(AwsApiLimiter limiter, AwsCall<T> call) {
+        limiter.acquire();
+        return call.execute();
+    }
+
+    @FunctionalInterface
+    private interface AwsCall<T> {
+        T execute();
     }
 }

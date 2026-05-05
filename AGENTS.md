@@ -88,6 +88,10 @@ change.
 - The project uses `maven-assembly-plugin` to produce a separate themes JAR.
 - Do not remove existing shade filters or Keycloak exclusions without a clear
   compatibility reason.
+- Do not reintroduce Guava only for rate limiting; production code uses the
+  internal `AwsApiRateLimiter`.
+- Keep Keycloak-provided dependencies such as Keycloak artifacts and SLF4J out
+  of the shaded provider JAR.
 - Prefer minimal dependency additions because this JAR runs inside Keycloak and
   can conflict with the server classpath.
 - Keep AWS SDK and other third-party versions centralized in `pom.xml`

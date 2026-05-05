@@ -11,6 +11,8 @@ This project uses two mock-testing layers for AWS IAM Identity Center.
   configuration failures.
 - Admin Console tab tests validate that declarative UI settings are persisted
   to `aws.*` realm attributes and rejected when invalid.
+- Rate-limit tests verify that existing-user update paths acquire one permit
+  per AWS API request, including create conflict, lookup, and update calls.
 - Integration tests use WireMock as a local HTTP endpoint for the AWS SDK v2
   IdentityStore client. These tests verify request serialization, endpoint
   override wiring, and the sync manager's behavior against mock AWS responses.

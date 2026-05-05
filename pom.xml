@@ -74,12 +74,6 @@
         </dependency>
 
         <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-            <version>33.5.0-jre</version>
-        </dependency>
-
-        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>${junit.jupiter.version}</version>
@@ -118,6 +112,7 @@
                             <artifactSet>
                                 <excludes>
                                     <exclude>org.keycloak:*</exclude>
+                                    <exclude>org.slf4j:*</exclude>
                                 </excludes>
                             </artifactSet>
                             <filters>

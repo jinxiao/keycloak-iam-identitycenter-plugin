@@ -102,10 +102,12 @@ class IdentityCenterSyncManagerTest {
                 .thenReturn(GetUserIdResponse.builder().userId("aws-user-1").build());
         when(client.updateUser(any(UpdateUserRequest.class)))
                 .thenReturn(UpdateUserResponse.builder().build());
+        RecordingLimiter limiter = new RecordingLimiter();
 
-        boolean ok = managerWith(client).syncSingleUser(session, realm, "kc-user-1");
+        boolean ok = managerWith(client, limiter).syncSingleUser(session, realm, "kc-user-1");
 
         assertTrue(ok);
+        assertEquals(3, limiter.acquireCount());
         ArgumentCaptor<UpdateUserRequest> updateRequest = ArgumentCaptor.forClass(UpdateUserRequest.class);
         verify(client).updateUser(updateRequest.capture());
         assertEquals("d-test", updateRequest.getValue().identityStoreId());
@@ -138,6 +140,13 @@ class IdentityCenterSyncManagerTest {
 
     private IdentityCenterSyncManager managerWith(IdentitystoreClient client) {
         return new IdentityCenterSyncManager(config -> AwsClientFactory.AwsClients.of(client));
+    }
+
+    private IdentityCenterSyncManager managerWith(IdentitystoreClient client, AwsApiLimiter limiter) {
+        return new IdentityCenterSyncManager(
+                config -> AwsClientFactory.AwsClients.of(client),
+                maxQps -> limiter
+        );
     }
 
     private RealmModel enabledRealm() {
@@ -180,5 +189,18 @@ class IdentityCenterSyncManagerTest {
         when(group.getId()).thenReturn(id);
         when(group.getName()).thenReturn(name);
         return group;
+    }
+
+    private static final class RecordingLimiter implements AwsApiLimiter {
+        private int acquireCount;
+
+        @Override
+        public void acquire() {
+            acquireCount++;
+        }
+
+        int acquireCount() {
+            return acquireCount;
+        }
     }
 }

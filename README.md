@@ -326,9 +326,23 @@ Response fields:
 
 ## Sync Behavior
 
-- Rate limiting is implemented with Guava `RateLimiter`
+- Rate limiting is applied before each AWS IdentityStore API request, not once
+  per Keycloak user, group, or membership. Existing AWS users and groups can
+  require multiple API calls, for example create conflict, ID lookup, and
+  update, and each call is counted against `aws.maxQps`.
 - Full sync uses a synchronous request/response flow
 - Conflict errors are treated as already synchronized
+
+## Packaging Behavior
+
+The provider JAR is still shaded because Keycloak does not ship the AWS SDK v2
+IdentityStore and STS clients required by this plugin. Keycloak dependencies
+remain `provided` and are excluded from the shaded JAR. SLF4J is also excluded
+from shading because Keycloak provides the logging API at runtime.
+
+Guava is not required by production code. The plugin uses an internal
+lightweight rate limiter so the shaded provider JAR does not need to include
+Guava or its transitive helper libraries.
 
 ## Testing
 
