@@ -262,9 +262,10 @@ public class IdentityCenterSyncManager {
                 return true;
             }
 
+            String userIdToDelete = existingUserId;
             callAws(limiter, () -> clients.identitystore().deleteUser(DeleteUserRequest.builder()
                             .identityStoreId(config.identityStoreId)
-                            .userId(existingUserId)
+                            .userId(userIdToDelete)
                             .build()));
             LOG.fine(String.format("Deleted user in Identity Center. realm=%s username=%s", realm.getName(), matchedUserName));
             return true;
