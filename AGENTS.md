@@ -123,6 +123,7 @@ change.
 - Release workflow assets must be named by function:
   `keycloak-aws-identitycenter-sync-provider-<version>.jar` and
   `keycloak-aws-identitycenter-sync-admin-theme-<version>.jar`.
+- Dependabot security updates are grouped by ecosystem and run on Saturdays.
 
 ## Final Checklist
 

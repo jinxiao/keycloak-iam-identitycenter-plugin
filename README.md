@@ -354,6 +354,16 @@ plugin needs.
 See [Testing](docs/testing.md) for local commands, mock strategy, and CI
 behavior.
 
+## Dependency Security Updates
+
+Dependabot is configured to scan Maven and GitHub Actions dependencies weekly
+on Saturdays. Security updates are grouped by ecosystem so multiple CVE fixes
+for Maven dependencies are opened in one Maven PR, and multiple GitHub Actions
+security fixes are opened in one GitHub Actions PR.
+
+Regular version-update PRs are disabled; Dependabot PRs are intended for
+security updates.
+
 ## Limitations
 
 - No persistent job storage
