@@ -68,6 +68,10 @@ public class AwsClientFactory {
             return identitystore;
         }
 
+        static AwsClients of(IdentitystoreClient identitystore) {
+            return new AwsClients(identitystore, null, null, null);
+        }
+
         @Override
         public void close() {
             closeQuietly(identitystore);

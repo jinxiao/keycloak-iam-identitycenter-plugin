@@ -36,6 +36,15 @@ import java.util.logging.Logger;
 
 public class IdentityCenterSyncManager {
     private static final Logger LOG = Logger.getLogger(IdentityCenterSyncManager.class.getName());
+    private final AwsClientsFactory clientsFactory;
+
+    public IdentityCenterSyncManager() {
+        this(AwsClientFactory::create);
+    }
+
+    IdentityCenterSyncManager(AwsClientsFactory clientsFactory) {
+        this.clientsFactory = clientsFactory;
+    }
 
     public SyncResult fullSync(KeycloakSession session, RealmModel realm) {
         int usersProcessed = 0;
@@ -49,7 +58,7 @@ public class IdentityCenterSyncManager {
         List<UserModel> users = session.users().searchForUserStream(realm, Collections.emptyMap(), null, null).toList();
         List<GroupModel> groups = listAllGroups(realm);
 
-        try (AwsClientFactory.AwsClients clients = AwsClientFactory.create(config)) {
+        try (AwsClientFactory.AwsClients clients = clientsFactory.create(config)) {
             for (UserModel user : users) {
                 limiter.acquire();
                 usersProcessed++;
@@ -91,7 +100,7 @@ public class IdentityCenterSyncManager {
         }
 
         AwsConfig config = AwsConfig.fromRealm(realm);
-        try (AwsClientFactory.AwsClients clients = AwsClientFactory.create(config)) {
+        try (AwsClientFactory.AwsClients clients = clientsFactory.create(config)) {
             return upsertUser(clients.identitystore(), config, user);
         }
     }
@@ -107,7 +116,7 @@ public class IdentityCenterSyncManager {
         }
 
         AwsConfig config = AwsConfig.fromRealm(realm);
-        try (AwsClientFactory.AwsClients clients = AwsClientFactory.create(config)) {
+        try (AwsClientFactory.AwsClients clients = clientsFactory.create(config)) {
             return upsertGroup(clients.identitystore(), config.identityStoreId, group);
         }
     }
@@ -126,7 +135,7 @@ public class IdentityCenterSyncManager {
         }
 
         AwsConfig config = AwsConfig.fromRealm(realm);
-        try (AwsClientFactory.AwsClients clients = AwsClientFactory.create(config)) {
+        try (AwsClientFactory.AwsClients clients = clientsFactory.create(config)) {
             return upsertGroupMembership(clients.identitystore(), config, user, group);
         } catch (Exception e) {
             LOG.log(Level.SEVERE, String.format("Failed to sync membership to Identity Center. realm=%s userId=%s groupId=%s",
@@ -174,7 +183,7 @@ public class IdentityCenterSyncManager {
         }
 
         AwsConfig config = AwsConfig.fromRealm(realm);
-        try (AwsClientFactory.AwsClients clients = AwsClientFactory.create(config)) {
+        try (AwsClientFactory.AwsClients clients = clientsFactory.create(config)) {
             String awsUserId = resolveAwsUserId(clients.identitystore(), config, user);
             String awsGroupId = findGroupIdByDisplayName(clients.identitystore(), config.identityStoreId, group.getName());
             if (awsUserId == null || awsGroupId == null) {
@@ -224,7 +233,7 @@ public class IdentityCenterSyncManager {
             return false;
         }
 
-        try (AwsClientFactory.AwsClients clients = AwsClientFactory.create(config)) {
+        try (AwsClientFactory.AwsClients clients = clientsFactory.create(config)) {
             String existingUserId = null;
             String matchedUserName = null;
             for (String candidate : userNameCandidates) {
@@ -266,7 +275,7 @@ public class IdentityCenterSyncManager {
         }
 
         AwsConfig config = AwsConfig.fromRealm(realm);
-        try (AwsClientFactory.AwsClients clients = AwsClientFactory.create(config)) {
+        try (AwsClientFactory.AwsClients clients = clientsFactory.create(config)) {
             String existingGroupId = findGroupIdByDisplayName(clients.identitystore(), config.identityStoreId, groupName);
             if (existingGroupId == null) {
                 LOG.fine(String.format("Group not found in Identity Center, skip delete. realm=%s group=%s", realm.getName(), groupName));
@@ -492,5 +501,10 @@ public class IdentityCenterSyncManager {
         public boolean hasFailures() {
             return usersFailed > 0 || groupsFailed > 0 || membershipsFailed > 0;
         }
+    }
+
+    @FunctionalInterface
+    interface AwsClientsFactory {
+        AwsClientFactory.AwsClients create(AwsConfig config);
     }
 }

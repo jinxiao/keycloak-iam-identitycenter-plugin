@@ -204,6 +204,18 @@ Requirements:
 - Maven 3.8+
 - Keycloak 26+
 
+Run unit tests:
+
+```bash
+mvn test
+```
+
+Run unit tests, WireMock integration tests, and packaging checks:
+
+```bash
+mvn verify
+```
+
 Compile:
 
 ```bash
@@ -317,6 +329,16 @@ Response fields:
 - Rate limiting is implemented with Guava `RateLimiter`
 - Full sync uses a synchronous request/response flow
 - Conflict errors are treated as already synchronized
+
+## Testing
+
+AWS IdentityStore tests use Mockito for unit tests and WireMock for integration
+tests. WireMock is used instead of Moto Server by default because Moto's
+IdentityStore coverage does not fully cover the update and lookup paths this
+plugin needs.
+
+See [Testing](docs/testing.md) for local commands, mock strategy, and CI
+behavior.
 
 ## Limitations
 

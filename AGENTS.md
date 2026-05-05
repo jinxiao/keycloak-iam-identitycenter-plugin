@@ -34,6 +34,14 @@ mvn -DskipTests clean compile
 ```
 
 ```bash
+mvn test
+```
+
+```bash
+mvn verify
+```
+
+```bash
 mvn -DskipTests clean package
 ```
 
@@ -42,6 +50,7 @@ mvn "-Dkc.version=26.6.1" -DskipTests clean package
 ```
 
 Always run at least `mvn -DskipTests clean compile` after Java or Maven changes.
+Run `mvn test` after testable logic changes.
 For documentation-only changes, explain if no build was run.
 Run `mvn -DskipTests clean package` after theme or packaging changes so the
 separate themes archive is verified.
