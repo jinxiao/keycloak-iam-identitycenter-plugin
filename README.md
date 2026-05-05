@@ -364,6 +364,16 @@ security fixes are opened in one GitHub Actions PR.
 Regular version-update PRs are disabled; Dependabot PRs are intended for
 security updates.
 
+GitHub repository security settings must also have Dependency graph,
+Dependabot alerts, and Dependabot security updates enabled. Group rules in
+`.github/dependabot.yml` use `applies-to: security-updates`, so CVE fixes in
+the same package ecosystem are combined where Dependabot can resolve them
+together.
+
+GitHub Actions workflows opt into the Node.js 24 JavaScript action runtime with
+`FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` and use Node 24-compatible action
+versions.
+
 ## Limitations
 
 - No persistent job storage
