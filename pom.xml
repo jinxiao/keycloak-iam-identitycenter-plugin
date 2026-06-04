@@ -1,4 +1,4 @@
-﻿<project xmlns="http://maven.apache.org/POM/4.0.0"
+<project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
          http://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -15,7 +15,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.release>21</maven.compiler.release>
         <maven.compiler.proc>full</maven.compiler.proc>
-        <resolved.keycloak.version>26.6.1</resolved.keycloak.version>
+        <resolved.keycloak.version>26.6.2</resolved.keycloak.version>
         <aws.sdk.version>2.42.7</aws.sdk.version>
         <junit.jupiter.version>6.0.1</junit.jupiter.version>
         <mockito.version>5.20.0</mockito.version>
